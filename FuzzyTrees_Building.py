@@ -9,7 +9,7 @@ import pandas as pd
 import math
 import random
 import os.path
-sys.path.insert(0, '/home/kyletos/Kaggle/Algorithms/FuzzyTreeProject/')
+sys.path.insert(0, '/home/kyletos/Projects/FuzzyTrees/')
 from operator import itemgetter
 from DecisionTrees import * 
 from FuzzyTrees_Building import *
@@ -241,9 +241,18 @@ def GetFuzzyBoostingTreesErrorsAndWeights(df, nEstimators, rateOfChange, df_weig
       currEst -= 1
 
     # Writing the TreeErrors
+    treeErrorFileNameIncomplete =  treeErrorFileName + "_Incomplete.csv"
     treeErrorFileName =  treeErrorFileName + ".csv"
-    if os.path.isfile(treeErrorFileName): treeErrorFile = open(treeErrorFileName, 'a')
-    else: treeErrorFile = open(treeErrorFileName, 'w')
+    print ("treeErrorFileNameIncomplete=", treeErrorFileNameIncomplete)
+    if os.path.isfile(treeErrorFileNameIncomplete): 
+      treeErrorFileIncomplete = open(treeErrorFileNameIncomplete, 'r')
+      treeErrorFileReader = csv.reader(treeErrorFileIncomplete)
+      next(treeErrorFileReader)
+      treeErrorTemp = [tuple(line) for line in treeErrorFileReader]
+      print ("\n\n\ntreeErrorTemp=", treeErrorTemp ,"\ntreeError=", treeError)
+      treeError = treeErrorTemp + treeError  
+      print ("FINAL: treeError=", treeError )
+    treeErrorFile = open(treeErrorFileName, 'w')
     treeErrorFileCSV=csv.writer(treeErrorFile)
     treeErrorFileCSV.writerow(["NumberOfEstimator,TreeErrorAssociatedWithCorrectness"])
     for tup in treeError:
@@ -252,12 +261,15 @@ def GetFuzzyBoostingTreesErrorsAndWeights(df, nEstimators, rateOfChange, df_weig
   except (KeyboardInterrupt,UnboundLocalError): #If user stops runnig, still save 
       treeErrorFileName =  treeErrorFileName + "_Incomplete.csv"
       if os.path.isfile(treeErrorFileName):
-        treeErrorFile = open(treeErrorFileName, 'a')
-        treeErrorFileCSV=csv.writer(treeErrorFile)
-      else:
-        treeErrorFile = open(treeErrorFileName, 'w')
-        treeErrorFileCSV=csv.writer(treeErrorFile)
-        treeErrorFileCSV.writerow(["NumberOfEstimator,TreeErrorAssociatedWithCorrectness"])
+        treeErrorFile = open(treeErrorFileName, 'r')
+        treeErrorFileReader = csv.reader(treeErrorFile)
+        next(treeErrorFileReader)
+        treeErrorTemp = [tuple(line) for line in treeErrorFileReader]
+        treeError = treeErrorTemp + treeError
+        treeErrorFile.close()
+      treeErrorFile = open(treeErrorFileName, 'w')
+      treeErrorFileCSV=csv.writer(treeErrorFile)
+      treeErrorFileCSV.writerow(["NumberOfEstimator,TreeErrorAssociatedWithCorrectness"])
       for tup in treeError:
         treeErrorFileCSV.writerow(tup)
       df_weights.to_csv("Answers/DF_WEIGHTS.csv", sep=',', index=False)
@@ -313,26 +325,44 @@ def AlterFuzzyWeights(df, df_weights, error, idColumn, rateOfChange, className, 
   alpha = .5 * math.log1p((1 - error) / error) * rateOfChange # exponent factor for adjustment of weights
   print ("error=", error, "\talpha*rateOfChange=", alpha, "\tCorrectFactor=", math.exp(-1*alpha), "\tIncorrectFactor=", math.exp(1*alpha)  )
   for decisionTup in nodeDecisions:
+    df_weights['MembershipNodeList'] = df['MembershipNodeList']
+    df_weights['Memberships'] = df['Memberships']
     dfIDs = df[ df['MembershipNodeList'].apply(lambda x: True if int(decisionTup[0]) in x else False) ][idColumn].tolist() # Get the nodes that have a membership in current node number
     nodeValuesTup = next(iteTup for iteTup in nodeValues if int(iteTup[0]) == int(decisionTup[0]) )
     nodeValuesTup = (int(nodeValuesTup[0]), float(nodeValuesTup[1]), str(nodeValuesTup[2]), float(nodeValuesTup[3]), float(nodeValuesTup[4]) )
     if nodeValuesTup[2] == "ThisIsAnEndNode": # If the node is all the same class, all the weights get reduced from being all correct
-      df_weights.loc[ df_weights[idColumn].isin(dfIDs), 'Weights'] = df_weights[ df_weights[idColumn].isin(dfIDs)]['Weights'] * math.exp(-1*alpha)
+      df_weights.loc[df_weights[idColumn].isin(dfIDs), 'Weights'] = df_weights.loc[df_weights[idColumn].isin(dfIDs)].apply(lambda row: ChangeWeightWithRow(weight=row['Weights'], moreOrLess=-1, memberships=row['Memberships'], alpha=alpha, nodeNumber=nodeValuesTup[0]), axis=1 )
+#      df_weights.loc[ df_weights[idColumn].isin(dfIDs), 'Weights'] = df_weights[ df_weights[idColumn].isin(dfIDs)]['Weights'] * math.exp(-1*alpha)
       continue
     if not pd.isnull(float(decisionTup[2]) ): # If the GT part of the node has a decision, change those accordingly
       gtCorrIDs  = df[ (df[idColumn].isin(dfIDs)) & (df[nodeValuesTup[2]] >  nodeValuesTup[3]) & (df[className] == int(decisionTup[2]) )][idColumn].tolist() # Get correctly Id'd Id's in GT group
       gtWrongIDs = df[ (df[idColumn].isin(dfIDs)) & (df[nodeValuesTup[2]] >  nodeValuesTup[3]) & (df[className] != int(decisionTup[2]) )][idColumn].tolist() # GEt incorrectly ID'd ID's in GT group
-      df_weights.loc[df_weights[idColumn].isin(gtCorrIDs ), 'Weights'] = df_weights[df_weights[idColumn].isin(gtCorrIDs )]['Weights'] * math.exp(-1*alpha) # Make weights of correct ones less
-      df_weights.loc[df_weights[idColumn].isin(gtWrongIDs), 'Weights'] = df_weights[df_weights[idColumn].isin(gtWrongIDs)]['Weights'] * math.exp( 1*alpha) # Make weights of incorrect ones more
+      if len(gtCorrIDs) > 0: 
+        df_weights.loc[df_weights[idColumn].isin(gtCorrIDs), 'Weights'] = df_weights.loc[df_weights[idColumn].isin(gtCorrIDs)].apply(lambda row: ChangeWeightWithRow(weight=row['Weights'], moreOrLess=-1, memberships=row['Memberships'], alpha=alpha, nodeNumber=nodeValuesTup[0]), axis=1 )
+      if len(gtWrongIDs) > 0: df_weights.loc[df_weights[idColumn].isin(gtWrongIDs), 'Weights'] = df_weights.loc[df_weights[idColumn].isin(gtWrongIDs)].apply(lambda row: ChangeWeightWithRow(weight=row['Weights'], moreOrLess=1, memberships=row['Memberships'], alpha=alpha, nodeNumber=nodeValuesTup[0]), axis=1 )
+#      df_weights.loc[df_weights[idColumn].isin(gtCorrIDs ), 'Weights'] = df_weights[df_weights[idColumn].isin(gtCorrIDs )]['Weights'] * math.exp(-1*alpha) # Make weights of correct ones less
+#      df_weights.loc[df_weights[idColumn].isin(gtWrongIDs), 'Weights'] = df_weights[df_weights[idColumn].isin(gtWrongIDs)]['Weights'] * math.exp( 1*alpha) # Make weights of incorrect ones more
     if not pd.isnull(float(decisionTup[1]) ): # If the LT part of the node has a decision, change those accordingly
       ltCorrIDs  = df[ (df[idColumn].isin(dfIDs)) & (df[nodeValuesTup[2]] <= nodeValuesTup[3]) & (df[className] == int(decisionTup[1]) )][idColumn].tolist() # Get correctly ID'd ID's in LT group
       ltWrongIDs = df[ (df[idColumn].isin(dfIDs)) & (df[nodeValuesTup[2]] <= nodeValuesTup[3]) & (df[className] != int(decisionTup[1]) )][idColumn].tolist() # Get incorrectly ID'd ID's in LT group
-      df_weights.loc[df_weights[idColumn].isin(ltCorrIDs ), 'Weights'] = df_weights[df_weights[idColumn].isin(ltCorrIDs )]['Weights'] * math.exp(-1*alpha) # Make weights of correct ones less
-      df_weights.loc[df_weights[idColumn].isin(ltWrongIDs), 'Weights'] = df_weights[df_weights[idColumn].isin(ltWrongIDs)]['Weights'] * math.exp( 1*alpha) # Make weights of incorrect ones more
+      if len(ltCorrIDs) > 0: 
+        df_weights.loc[df_weights[idColumn].isin(ltCorrIDs), 'Weights'] = df_weights.loc[df_weights[idColumn].isin(ltCorrIDs)].apply(lambda row: ChangeWeightWithRow(weight=row['Weights'], moreOrLess=-1, memberships=row['Memberships'], alpha=alpha, nodeNumber=nodeValuesTup[0]), axis=1 )
+      if len(ltWrongIDs) > 0: df_weights.loc[df_weights[idColumn].isin(ltWrongIDs), 'Weights'] = df_weights.loc[df_weights[idColumn].isin(ltWrongIDs)].apply(lambda row: ChangeWeightWithRow(weight=row['Weights'], moreOrLess=1, memberships=row['Memberships'], alpha=alpha, nodeNumber=nodeValuesTup[0]), axis=1 )
+#      df_weights.loc[df_weights[idColumn].isin(ltCorrIDs ), 'Weights'] = df_weights[df_weights[idColumn].isin(ltCorrIDs )]['Weights'] * math.exp(-1*alpha) # Make weights of correct ones less
+#      df_weights.loc[df_weights[idColumn].isin(ltWrongIDs), 'Weights'] = df_weights[df_weights[idColumn].isin(ltWrongIDs)]['Weights'] * math.exp( 1*alpha) # Make weights of incorrect ones more
   nodeDecisionsFile.close()
   del nodeDecisionsFileReader
   nodeValuesFile.close()
   del nodeValuesFileReader
   return df_weights
 
+###########################################################
+# Scales the changing of weights based upon the membership
+# located at the node.
+###########################################################
 
+def ChangeWeightWithRow(weight, moreOrLess, memberships, alpha, nodeNumber):
+  nodeTup = [tup for tup in memberships if int(tup[0]) == int(nodeNumber) ]
+  print ("nodeTup=", nodeTup)
+  print ( "\tfactor=", math.exp(alpha * moreOrLess * nodeTup[0][1]), "\tweight=", weight, "\tfinal_weight=", weight * math.exp(alpha * moreOrLess * nodeTup[0][1] ) )
+  return weight * math.exp(alpha * moreOrLess * nodeTup[0][1])

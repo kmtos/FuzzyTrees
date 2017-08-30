@@ -6,7 +6,7 @@ import sys
 from collections import defaultdict
 sys.path.insert(0, '/home/kyletos/Kaggle/Tools/')
 sys.path.insert(0, '/home/kyletos/Kaggle/Algorithms/')
-sys.path.insert(0, '/home/kyletos/Kaggle/Algorithms/FuzzyTreeProject/')
+sys.path.insert(0, '/home/kyletos/Projects/FuzzyTrees/')
 from formatting import *
 from Imputation import *
 from subprocess import check_call
@@ -192,36 +192,36 @@ df_weights = df_noStrings[['Survived','PassengerId']].copy()
 df_weights["Weights"] = round(float(1 / len(df.index) ), 15)
 print ("giniEndVal=", .01/len(df_weights.index))
 #MakeTreeOld(df=df_noStrings, className='Survived', nGiniSplits=10, giniEndVal=.005/len(df_weights.index), maxDepth=5, idColumn='PassengerId', minSamplesSplit=3, df_weights=df_weights,
-#            nodeDFIDsFileName='/home/kyletos/Kaggle/Algorithms/FuzzyTreeProject/TestTheFuzzy/Answers/NodeDFIDs_nGiniSplits10_giniEndVal0p005_maxDepth5',
-#            nodeValuesFileName='/home/kyletos/Kaggle/Algorithms/FuzzyTreeProject/TestTheFuzzy/Answers/NodeValues_nGiniSplits10_giniEndVal0p005_maxDepth5',
-#            nodeDecisionsFileName='/home/kyletos/Kaggle/Algorithms/FuzzyTreeProject/TestTheFuzzy/Answers/NodeDecisions_nGiniSplits10_giniEndVal0p005_maxDepth5')
+#            nodeDFIDsFileName='/home/kyletos/Projects/FuzzyTrees/TestTheFuzzy/Answers/NodeDFIDs_nGiniSplits10_giniEndVal0p005_maxDepth5',
+#            nodeValuesFileName='/home/kyletos/Projects/FuzzyTrees/TestTheFuzzy/Answers/NodeValues_nGiniSplits10_giniEndVal0p005_maxDepth5',
+#            nodeDecisionsFileName='/home/kyletos/Projects/FuzzyTrees/TestTheFuzzy/Answers/NodeDecisions_nGiniSplits10_giniEndVal0p005_maxDepth5')
 #ClassifyWithTree(df_test, 
 #                 className='Survived', idColumn='PassengerId', maxDepth=5, 
-#                 outputFileName='/home/kyletos/Kaggle/Algorithms/FuzzyTreeProject/TestTheFuzzy/Answers/Test_Answers_nGiniSplits10_iniEndValp01_maxDepth5',
-#                 nodeDecisionsFileName='/home/kyletos/Kaggle/Algorithms/FuzzyTreeProject/TestTheFuzzy/Answers/NodeDecisions_nGiniSplits10_giniEndVal0p005_maxDepth5.csv', 
-#                 nodeValuesFileName='/home/kyletos/Kaggle/Algorithms/FuzzyTreeProject/TestTheFuzzy/Answers/NodeValues_nGiniSplits10_giniEndVal0p005_maxDepth5.csv')
+#                 outputFileName='/home/kyletos/Projects/FuzzyTrees/TestTheFuzzy/Answers/Test_Answers_nGiniSplits10_iniEndValp01_maxDepth5',
+#                 nodeDecisionsFileName='/home/kyletos/Projects/FuzzyTrees/TestTheFuzzy/Answers/NodeDecisions_nGiniSplits10_giniEndVal0p005_maxDepth5.csv', 
+#                 nodeValuesFileName='/home/kyletos/Projects/FuzzyTrees/TestTheFuzzy/Answers/NodeValues_nGiniSplits10_giniEndVal0p005_maxDepth5.csv')
 
 #paramDictMakeTree = {'className': 'Survived', 'nGiniSplits': 10, 'giniEndVal': .01/len(df_weights.index), 'duality':0, 'maxDepth':5, 'idColumn':'PassengerId', 'minSamplesSplit':5,
-#                     'nodeValuesFileName': '/home/kyletos/Kaggle/Algorithms/FuzzyTreeProject/TestTheFuzzy/Answers/NodeValues_nGiniSplits10_giniEndVal0p005_maxDepth5_',
-#                     'nodeDecisionsFileName': '/home/kyletos/Kaggle/Algorithms/FuzzyTreeProject/TestTheFuzzy/Answers/NodeDecisions_nGiniSplits10_giniEndVal0p005_maxDepth5_'}
+#                     'nodeValuesFileName': '/home/kyletos/Projects/FuzzyTrees/TestTheFuzzy/Answers/NodeValues_nGiniSplits10_giniEndVal0p005_maxDepth5_',
+#                     'nodeDecisionsFileName': '/home/kyletos/Projects/FuzzyTrees/TestTheFuzzy/Answers/NodeDecisions_nGiniSplits10_giniEndVal0p005_maxDepth5_'}
 #GetBoostingTreesErrorsAndWeights(df=df_noStrings, nEstimators=5, rateOfChange=.1, df_weights=df_weights, paramDict=paramDictMakeTree, colRandomness=.1, rowRandomness=.1, 
-#                                 treeErrorFileName= '/home/kyletos/Kaggle/Algorithms/FuzzyTreeProject/TestTheFuzzy/Answers/TreeBoostingErrors_nEst5_maxDepth5_minSplit5',
+#                                 treeErrorFileName= '/home/kyletos/Projects/FuzzyTrees/TestTheFuzzy/Answers/TreeBoostingErrors_nEst5_maxDepth5_minSplit5',
 #                                 middleStart=False, middleStartNum=-1)
 #CalssifyWithBoost(df_test=df_test, nEstimators=5, maxDepth=5, idColumn=paramDictMakeTree['idColumn'], className=paramDictMakeTree['className'], uniqueClasses=df['Survived'].unique(),  
-#                  treeErrorFileName='/home/kyletos/Kaggle/Algorithms/FuzzyTreeProject/TestTheFuzzy/Answers/TreeBoostingErrors_nEst5_maxDepth5_minSplit5', 
+#                  treeErrorFileName='/home/kyletos/Projects/FuzzyTrees/TestTheFuzzy/Answers/TreeBoostingErrors_nEst5_maxDepth5_minSplit5', 
 #                  nodeValuesFileName=paramDictMakeTree['nodeValuesFileName'], nodeDecisionsFileName=paramDictMakeTree['nodeDecisionsFileName'], 
-#                  boostAnswersFileName='/home/kyletos/Kaggle/Algorithms/FuzzyTreeProject/TestTheFuzzy/Answers/BoostedAnswers_nEst5_maxDepth5_minSplit5')
+#                  boostAnswersFileName='/home/kyletos/Projects/FuzzyTrees/TestTheFuzzy/Answers/BoostedAnswers_nEst5_maxDepth5_minSplit5')
 
 #ClassifyWithFuzzyTree(df_test=df_test, className='Survived', idColumn='PassengerId', maxDepth=5, duality=.9, uniqueClasses=df['Survived'].unique(),
-#                 outputFileName='/home/kyletos/Kaggle/Algorithms/FuzzyTreeProject/TestTheFuzzy/Answers/FuzzyTest_Answers_nGiniSplits10_iniEndValp01_maxDepth5',  
-#                 nodeDecisionsFileName='/home/kyletos/Kaggle/Algorithms/FuzzyTreeProject/TestTheFuzzy/Answers/NodeDecisions_nGiniSplits10_giniEndVal0p005_maxDepth5', 
-#                 nodeValuesFileName='/home/kyletos/Kaggle/Algorithms/FuzzyTreeProject/TestTheFuzzy/Answers/NodeValues_nGiniSplits10_giniEndVal0p005_maxDepth5')
+#                 outputFileName='/home/kyletos/Projects/FuzzyTrees/TestTheFuzzy/Answers/FuzzyTest_Answers_nGiniSplits10_iniEndValp01_maxDepth5',  
+#                 nodeDecisionsFileName='/home/kyletos/Projects/FuzzyTrees/TestTheFuzzy/Answers/NodeDecisions_nGiniSplits10_giniEndVal0p005_maxDepth5', 
+#                 nodeValuesFileName='/home/kyletos/Projects/FuzzyTrees/TestTheFuzzy/Answers/NodeValues_nGiniSplits10_giniEndVal0p005_maxDepth5')
 
-#MakeFuzzyTree(df=df_noStrings, className='Survived', nGiniSplits=10, giniEndVal=.005/len(df_weights.index), maxDepth=5, idColumn='PassengerId', minSamplesSplit=5, duality=.95, df_weights=df_weights,  nodeValuesFileName='/home/kyletos/Kaggle/Algorithms/FuzzyTreeProject/TestTheFuzzy/Answers/NodeValues_nGiniSplits10_giniEndVal0p005_maxDepth5', nodeDecisionsFileName='/home/kyletos/Kaggle/Algorithms/FuzzyTreeProject/TestTheFuzzy/Answers/NodeDecisions_nGiniSplits10_giniEndVal0p005_maxDepth5')
-#ClassifyWithFuzzyTree(df_test=df_test, className='Survived', idColumn='PassengerId', maxDepth=5, duality=.9, uniqueClasses=df['Survived'].unique(), outputFileName='/home/kyletos/Kaggle/Algorithms/FuzzyTreeProject/TestTheFuzzy/Answers/FuzzyTest_Answers_nGiniSplits10_iniEndValp01_maxDepth5', nodeDecisionsFileName='/home/kyletos/Kaggle/Algorithms/FuzzyTreeProject/TestTheFuzzy/Answers/NodeDecisions_nGiniSplits10_giniEndVal0p005_maxDepth5', nodeValuesFileName='/home/kyletos/Kaggle/Algorithms/FuzzyTreeProject/TestTheFuzzy/Answers/NodeValues_nGiniSplits10_giniEndVal0p005_maxDepth5')
-paramDictMakeFuzzyTree = {'className': 'Survived', 'nGiniSplits': 10, 'giniEndVal': .005/len(df_weights.index), 'duality':.95,'maxDepth':7, 'idColumn':'PassengerId', 'minSamplesSplit':3, 'nodeValuesFileName': '/home/kyletos/Kaggle/Algorithms/FuzzyTreeProject/TestTheFuzzy/Answers/NodeValues_nGiniSplits10_giniEndVal0p005_maxDepth7_', 'nodeDecisionsFileName': '/home/kyletos/Kaggle/Algorithms/FuzzyTreeProject/TestTheFuzzy/Answers/NodeDecisions_nGiniSplits10_giniEndVal0p005_maxDepth7_'}
-GetFuzzyBoostingTreesErrorsAndWeights(df=df_noStrings, nEstimators=100, rateOfChange=.05, df_weights=df_weights, paramDict=paramDictMakeFuzzyTree, colRandomness=.15, rowRandomness=.15,treeErrorFileName= '/home/kyletos/Kaggle/Algorithms/FuzzyTreeProject/TestTheFuzzy/Answers/TreeBoostingErrors_nEst5_maxDepth7_minSplit5', middleStart=False, middleStartNum=-1)
-#ClassifyWithBoostedFuzzyTree(df_test=df_test, nEstimators=5, className='Survived', idColumn='PassengerId', maxDepth=5, duality=.95, uniqueClasses=df['Survived'].unique(), treeErrorFileName='/home/kyletos/Kaggle/Algorithms/FuzzyTreeProject/TestTheFuzzy/Answers/TreeBoostingErrors_nEst5_maxDepth5_minSplit5', outputFileName='/home/kyletos/Kaggle/Algorithms/FuzzyTreeProject/TestTheFuzzy/Answers/FuzzyTest_Answers_nGiniSplits10_iniEndValp01_maxDepth5', nodeDecisionsFileName=paramDictMakeFuzzyTree['nodeDecisionsFileName'], nodeValuesFileName=paramDictMakeFuzzyTree['nodeValuesFileName'])
+#MakeFuzzyTree(df=df_noStrings, className='Survived', nGiniSplits=10, giniEndVal=.005/len(df_weights.index), maxDepth=5, idColumn='PassengerId', minSamplesSplit=5, duality=.95, df_weights=df_weights,  nodeValuesFileName='/home/kyletos/Projects/FuzzyTrees/TestTheFuzzy/Answers/NodeValues_nGiniSplits10_giniEndVal0p005_maxDepth5', nodeDecisionsFileName='/home/kyletos/Projects/FuzzyTrees/TestTheFuzzy/Answers/NodeDecisions_nGiniSplits10_giniEndVal0p005_maxDepth5')
+#ClassifyWithFuzzyTree(df_test=df_test, className='Survived', idColumn='PassengerId', maxDepth=5, duality=.9, uniqueClasses=df['Survived'].unique(), outputFileName='/home/kyletos/Projects/FuzzyTrees/TestTheFuzzy/Answers/FuzzyTest_Answers_nGiniSplits10_iniEndValp01_maxDepth5', nodeDecisionsFileName='/home/kyletos/Projects/FuzzyTrees/TestTheFuzzy/Answers/NodeDecisions_nGiniSplits10_giniEndVal0p005_maxDepth5', nodeValuesFileName='/home/kyletos/Projects/FuzzyTrees/TestTheFuzzy/Answers/NodeValues_nGiniSplits10_giniEndVal0p005_maxDepth5')
+paramDictMakeFuzzyTree = {'className': 'Survived', 'nGiniSplits': 10, 'giniEndVal': .005/len(df_weights.index), 'duality':.95,'maxDepth':7, 'idColumn':'PassengerId', 'minSamplesSplit':3, 'nodeValuesFileName': '/home/kyletos/Projects/FuzzyTrees/TestTheFuzzy/Answers/NodeValues_nGiniSplits10_giniEndVal0p005_maxDepth7_', 'nodeDecisionsFileName': '/home/kyletos/Projects/FuzzyTrees/TestTheFuzzy/Answers/NodeDecisions_nGiniSplits10_giniEndVal0p005_maxDepth7_'}
+GetFuzzyBoostingTreesErrorsAndWeights(df=df_noStrings, nEstimators=3, rateOfChange=.05, df_weights=df_weights, paramDict=paramDictMakeFuzzyTree, colRandomness=.15, rowRandomness=.15,treeErrorFileName= '/home/kyletos/Projects/FuzzyTrees/TestTheFuzzy/Answers/TreeBoostingErrors_nEst5_maxDepth7_minSplit5', middleStart=False, middleStartNum=-1)
+#ClassifyWithBoostedFuzzyTree(df_test=df_test, nEstimators=5, className='Survived', idColumn='PassengerId', maxDepth=5, duality=.95, uniqueClasses=df['Survived'].unique(), treeErrorFileName='/home/kyletos/Projects/FuzzyTrees/TestTheFuzzy/Answers/TreeBoostingErrors_nEst5_maxDepth5_minSplit5', outputFileName='/home/kyletos/Projects/FuzzyTrees/TestTheFuzzy/Answers/FuzzyTest_Answers_nGiniSplits10_iniEndValp01_maxDepth5', nodeDecisionsFileName=paramDictMakeFuzzyTree['nodeDecisionsFileName'], nodeValuesFileName=paramDictMakeFuzzyTree['nodeValuesFileName'])
 
 sys.stdout = orig_stdout
 stdOutFile.close()

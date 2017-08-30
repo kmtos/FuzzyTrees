@@ -10,7 +10,7 @@ import math
 import random
 from operator import itemgetter
 import os.path
-sys.path.insert(0, '/home/kyletos/Kaggle/Algorithms/FuzzyTreeProject/')
+sys.path.insert(0, '/home/kyletos/Projects/FuzzyTrees/')
 from FuzzyTrees_Building import  *
 
 ####################################################################
