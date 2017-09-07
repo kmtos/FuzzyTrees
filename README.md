@@ -27,8 +27,9 @@ Fuzzy Trees: 1) http://www.cs.ubbcluj.ro/~gabis/DocDiplome/DT/FuzzyDT/fuzzy
 #################################
 ######## Implementation #########
 #################################
-FIRST NOTE: I like output. A lot of output. So scattered throughout this code lies many, many print statements. If you don't wantthe output, then comment it out. I like it so that I can quickly scan through it and verify that it is doing what I want it to do.
+FIRST NOTE: I like output. A lot of output. So scattered throughout this code lies many, many print statements. If you don't want the output, then comment it out. I like it so that I can quickly scan through it and verify that it is doing what I want it to do.
 SECOND NOTE: Any variable that has "FileName" should have the ".csv" left off of it. The functions need the names in that form.
+THIRD NOTE: The answers when classifying come in twoo forms. 1) The ID column and their classValue. 2) Same as the first except with a lot more information like percentage belief.
 
 ############## FILES ##############
 
