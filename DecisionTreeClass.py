@@ -25,9 +25,9 @@ class DecisionTree(object):
                maxDepth=4, nGiniSplits=10, giniEndVal=0.01, nClasses=2, minSamplesSplit=2, printOutput=True):
     self.idColumn   = idColumn	  # Column that indexes dataframe
     self.className  = className   # Column that will be classified
-    self.nodeDFIDsFileName     = nodeDFIDsFileName + ".csv"     # Name of the file that the Datafram ID's for each node will be written to
-    self.nodeValuesFileName    = nodeValuesFileName + ".csv"    # Name of the file describing the cuts at every node
-    self.nodeDecisionsFileName = nodeDecisionsFileName + ".csv" # Name of the file describing the everything about the end nodes (Nodes with no further decisions)
+    self.nodeDFIDsFileName     = nodeDFIDsFileName     # Name of the file that the Datafram ID's for each node will be written to
+    self.nodeValuesFileName    = nodeValuesFileName    # Name of the file describing the cuts at every node
+    self.nodeDecisionsFileName = nodeDecisionsFileName # Name of the file describing the everything about the end nodes (Nodes with no further decisions)
     self.outputFileName = outputFileName + ".csv" # Name of the output classification on a provided test set
     self.maxDepth    = maxDepth    # The maximum depth of the decision tree
     self.nGiniSplits = nGiniSplits # Number of splits along the range of values to test the optimum splitting of a column for the next branch
@@ -40,7 +40,8 @@ class DecisionTree(object):
     self.nodeDFIDs     = []  # List of tuples that keeps track of the IDs of each entry in the df at each node
     self.nodeValues    = []  # List of tuples that keeps track of the cut values, the column cut on, and the gini improvement at each node
     self.nodeDecisions = []  # list the decision for the GT and LT group at each leaf with no further daughters. Also gives the correct amounts in each decision
- 
+    self.testDFIDs     = []  # List of the test df ID's at each node
+   
   def FindingBestSplit(self, df, df_weights, nodeCount):
     '''
     This finds which column at which value moves the 'Gini Index' closest to 0 (perfect classification).
@@ -55,17 +56,17 @@ class DecisionTree(object):
       if len(df) == rows:
         if self.printOutput: print ("*****************END NODE")
         return ( nodeCount, 1.0, 'ThisIsAnEndNode', np.NaN, np.NaN)
-    columns = [col for col in df if col != self.className and col != self.idColumn] # FUZZY and col != "Memberships" and col != "MembershipNodeList"] 
+    columns = [col for col in df if col != self.className and col != self.idColumn] 
     bestGiniSplit = (-1, -1, '', -100, -1)
     for col in columns:
-      unique = df[col].unique() # NEW sorted(df[col].unique()
-      high = df[col.max() # NEW unique[len(unique)-1]
-      low = df[col].min() # NEW unique[0]
+      unique = df[col].unique() 
+      high = df[col].max() 
+      low = df[col].min() 
       splitLength = (high - low) / (nGiniSplits+1)
       splits = []
       if len(unique) == 1: continue
       elif len(unique) <= nGiniSplits: 
-	unique = sorted(unique) #NEW
+	unique = sorted(unique) 
         for i in range(len(unique)-1):
           splits.append( (unique[i] + unique[i+1])/2.0)
       else: 
@@ -118,9 +119,9 @@ class DecisionTree(object):
         bestGiniDecrease = (currentGiniIndex-newGiniIndex, tup[2])
     return bestGiniDecrease
   
-  def MakeTreeOld(self, df, df_weights):
+  def BuildTree(self, df, df_weights):
     '''
-    This makes the tree and decides on the cuts to use at each split. 'self.nodeValues' and 'self.nodeDFIds' keep track of the nodes.
+    This makes the tree and decides on the cuts to use at each split. 'self.nodeValues' and 'self.nodeDFIDs' keep track of the nodes.
     'parentTup' is a tuple of the parent node, grabbed from the current node number. Nodes are numbered left to right starting at 0. 
       - 0->1,2 | 1->3,4 | 2->5,6 | 3->7,8 | 4->9,10, with the lower number (i.e. 9) having the LT group and the larger value (i.e 10) having the GT group
     If parent node is a BlankNode or an EndNode, then make two BlankNode children.
@@ -132,14 +133,14 @@ class DecisionTree(object):
     while nodeCount <= maxNodes: 
       if nodeCount == 0: 
         self.nodeValues.append( FindingBestSplit(df=df, df_weights=df_weights, nodeCount=nodeCount) )
-        self.nodeDFIds.append( (nodeCount, df[self.idColumn].tolist()) )
+        self.nodeDFIDs.append( (nodeCount, df[self.idColumn].tolist()) )
       else:
         parentTup = self.nodeValues[(nodeCount-1) // 2] 
-        parentDFIDs = self.nodeDFIds[(nodeCount-1) // 2][1] 
+        parentDFIDs = self.nodeDFIDs[(nodeCount-1) // 2][1] 
         if self.printOutput: print ("\nnode=", nodeCount, "parentNode=", (nodeCount-1) // 2, "\tparentTup=", parentTup, "\tlen(parentDFIDs)=", len(parentDFIDs))
         if pd.isnull(parentTup[3]) and pd.isnull(parentTup[4]): 
           self.nodeValues.append( (nodeCount, np.NaN, '' , np.NaN, np.NaN) )
-          self.nodeDFIds.append( (nodeCount, [] ) )
+          self.nodeDFIDs.append( (nodeCount, [] ) )
         else: 
           if nodeCount % 2  == 1: dfCurr = df.loc[(df[self.idColumn].isin(parentDFIDs)) & (df[parentTup[2]] <= parentTup[3]) ] 
           else: dfCurr = df.loc[(df[self.idColumn].isin(parentDFIDs)) & (df[parentTup[2]] > parentTup[3]) ] 
@@ -150,8 +151,8 @@ class DecisionTree(object):
             nodeDFIds.append( (nodeCount, [] ) )
           else:
             self.nodeValues.append(FindingBestSplit(df=dfCurr, df_weights=df_weights, nodeCount=nodeCount) ) 
-            self.nodeDFIds.append( (nodeCount, dfCurr[self.idColumn].tolist()) ) 
-            if self.printOutput: print ("######## NEW ########:", "nodeValues[nodeCount]=", self.nodeValues[nodeCount], "\tlen(nodeDFIds[", nodeCount, "][1])=", len(self.nodeDFIds[nodeCount][1]))
+            self.nodeDFIDs.append( (nodeCount, dfCurr[self.idColumn].tolist()) ) 
+            if self.printOutput: print ("######## NEW ########:", "nodeValues[nodeCount]=", self.nodeValues[nodeCount], "\tlen(nodeDFIds[", nodeCount, "][1])=", len(self.nodeDFIDs[nodeCount][1]))
             if not pd.isnull(self.nodeValues[nodeCount][3]) and self.printOutput: 
               print ("len(lessThan)=", len(dfCurr.loc[dfCurr[self.nodeValues[nodeCount][2]] <= self.nodeValues[nodeCount][3]]), 
                      "\tlen(greaterThan)=", len(dfCurr.loc[dfCurr[self.nodeValues[nodeCount][2]] > self.nodeValues[nodeCount][3]]) )
@@ -163,7 +164,7 @@ class DecisionTree(object):
     This writes out to a .csv file the tuples that contain the nodes with their cut information and the decrease in Gini Index.
     '''
     if self.printOutput: print ("\n\n###########################\nWriting Out the Nodes Values\n###########################")
-    nodeValuesFile = open(self.nodeValuesFileName, 'w')
+    nodeValuesFile = open(self.nodeValuesFileName + "csv", 'w')
     nodeValuesFileCSV=csv.writer(nodeValuesFile)
     nodeValuesFileCSV.writerow(["NodeNumber,GiniIncrease,ColumnName,ValueOfSplit,RangeBetweenSplits"])
     for tup in self.nodeValues:
@@ -174,10 +175,10 @@ class DecisionTree(object):
     This writes out to a .csv file the node numbers and the datafram IDs that are present in each node.
     '''
     if self.printOutput: print ("\n\n###########################\nWriting Out the Nodes DF IDs\n###########################")
-    nodeDFIdsFile = open(self.nodeDFIDsFileName, 'w')
+    nodeDFIdsFile = open(self.nodeDFIDsFileName + ".csv", 'w')
     nodeDFIdsFileCSV=csv.writer(nodeDFIdsFile)
     nodeDFIdsFileCSV.writerow(["NodeNumber,ListOfID'sAtNode"])
-    for tup in self.nodeDFIds:
+    for tup in self.nodeDFIDs:
       nodeDFIdsFileCSV.writerow(tup)
  
   def GetWeightedNodeDecisions(df, leaf, index, soloNodeDecision, GTorLT, df_weights):
@@ -251,8 +252,8 @@ class DecisionTree(object):
     for ite in range(self.maxNodes, self.maxNodes - 2**self.maxDepth, -1):
       index = ite
       currentLeaf = self.nodeValues[index]
-      currentDF = df.loc[df[self.idColumn].isin(self.nodeDFIds[index][1])]
-      currentDF_weights = df_weights.loc[ df[self.idColumn].isin(self.nodeDFIds[index][1])]
+      currentDF = df.loc[df[self.idColumn].isin(self.nodeDFIDs[index][1])]
+      currentDF_weights = df_weights.loc[ df[self.idColumn].isin(self.nodeDFIDs[index][1])]
       soloNode = False
       GTorLT = 0
       while pd.isnull(currentLeaf[1] ) and  currentLeaf[2] == '' and pd.isnull(currentLeaf[3] ) and pd.isnull(currentLeaf[4] ): 
@@ -263,8 +264,8 @@ class DecisionTree(object):
         if not pd.isnull(sisterLeaf[1] ) and sisterLeaf[2] != '' and not pd.isnull(sisterLeaf[3] ) and not pd.isnull(sisterLeaf[4] ): soloNode = True
         index = (index-1) // 2
         currentLeaf = self.nodeValues[index]
-        currentDF = df.loc[df[self.idColumn].isin(self.nodeDFIds[index][1])]
-        currentDF_weights = df_weights.loc[ df[self.idColumn].isin(self.nodeDFIds[index][1])]
+        currentDF = df.loc[df[self.idColumn].isin(self.nodeDFIDs[index][1])]
+        currentDF_weights = df_weights.loc[ df[self.idColumn].isin(self.nodeDFIDs[index][1])]
       if self.printOutput: print ("\n\nindex=", index, "\tcurrentLeaf=", currentLeaf, "\tlen(currentDF)=", len(currentDF) )
       currentNodeDecision = (GetWeightedNodeDecisions(df=currentDF, leaf=currentLeaf, index=index, soloNodeDecision=soloNode, GTorLT=GTorLT, df_weights=currentDF_weights) )
       try: 
@@ -274,7 +275,7 @@ class DecisionTree(object):
         self.nodeDecisions.append(currentNodeDecision )
   
     #Write out the self.nodeDecisions
-    nodeDecisionsFile = open(self.nodeDecisionsFileName, 'w')
+    nodeDecisionsFile = open(self.nodeDecisionsFileName + ".csv", 'w')
     nodeDecisionsFileCSV=csv.writer(nodeDecisionsFile)
     nodeDecisionsFileCSV.writerow(["NodeNumber,LT_className_decision,GT_className_decision,LT_WeightCorrect,GT_WeightCorrect,LT_TotalWeight,GT_TotalWeight"])
     for tup in self.nodeDecisions:
@@ -282,81 +283,109 @@ class DecisionTree(object):
   
   
  
-  def ClassifyWithTree(df_test):
+  def ClassifyWithTree(self, df_test):
     '''
     This classifies test points, whether validation or a test set, and gives the predicted answer from the tree. First it iterates throught the nodes from the tree and stores
-    each dataframe entry along the tree in the proper node. 'dfIDList' stores what dataframe IDs are at each node. 'dfCurr' has the dataframe entries at the current node.
-    First it checks if the node is a BlankNode, and if it is, then it creates empty node placeholders in 'dfIDList', if it isn't at the maxdepth yet. Then it checks if it is 
+    each dataframe entry along the tree in the proper node. 'self.testDFIDs' stores what dataframe IDs are at each node. 'dfCurr' has the dataframe entries at the current node.
+    First it checks if the node is a BlankNode, and if it is, then it creates empty node placeholders in 'self.testDFIDs', if it isn't at the maxdepth yet. Then it checks if it is 
     an EndNode, and if it is, then it sets all test entry answers accordingly and creates empty node placeholders for deeper nodes from it. Then it checks if the node is at 
     the max tree depth. If it is, it then splits the entries at the current node into the GT and LT nodes, and checks if the node has a decision in any of its nodes. Finally,
     if it is at max tree depth, then it does have a decision in the decision file, and it is applied to all test set entries in at each node.
     '''
-    if self.printOutput: print ("\n\n####################################\n Classifying test points with Tree from Make Tree\n#############################################")
-    df_Answers = df_test.filter([idColumn], axis=1)
-    df_Answers[className] = np.nan 
-    with open(nodeDecisionsFileName) as nodeDecisionsFile:
-      nodeDecisionsFileReader = csv.reader(nodeDecisionsFile)
-      next(nodeDecisionsFileReader)
-      nodeDecisions = [tuple(line) for line in nodeDecisionsFileReader]
-    with open(nodeValuesFileName) as nodeValuesFile:
-      nodeValuesFileReader = csv.reader(nodeValuesFile)
-      next(nodeValuesFileReader)
-      nodeValues = [tuple(line) for line in nodeValuesFileReader]
+    if self.printOutput: print ("\n\n####################################\n Classifying test points with Tree from Build Tree\n#############################################")
+    df_Answers = df_test.filter([self.idColumn], axis=1)
+    df_Answers[self.className] = np.nan 
   
-    dfIDList = [ (0, df_test[idColumn].tolist()) ]
-    for ite in nodeValues: 
+    self.testDFIDs = [ (0, df_test[self.idColumn].tolist()) ]
+    for ite in self.nodeValues: 
       nodeValueTup = (int(ite[0]),  float(ite[1]), ite[2], float(ite[3]), float(ite[4]))
-      if self.printOutput: print ("\n\tnodeValueTup=", nodeValueTup, "\tnodeValueTup[0]=", nodeValueTup[0], "\tdfIDList[nodeValueTup[0]][0])=", dfIDList[nodeValueTup[0]][0])
-      dfCurr = df_test.loc[df_test[idColumn].isin(dfIDList[nodeValueTup[0]][1])] 
+      if self.printOutput: print ("\n\tnodeValueTup=", nodeValueTup, "\tnodeValueTup[0]=", nodeValueTup[0], "\tself.testDFIDs[nodeValueTup[0]][0])=", self.testDFIDs[nodeValueTup[0]][0])
+      dfCurr = df_test.loc[df_test[self.idColumn].isin(self.testDFIDs[nodeValueTup[0]][1])] 
   
       if pd.isnull(nodeValueTup[3]) and pd.isnull(nodeValueTup[4]) and nodeValueTup[2] == '' and pd.isnull(nodeValueTup[1]): 
-        if self.printOutput: print ("\tdf=", dfIDList[nodeValueTup[0]][1])
-        if nodeValueTup[0] < maxNodeCount / 2: 
-          dfIDList.append( (nodeValueTup[0]*2 + 1, [] ) )
-          dfIDList.append( (nodeValueTup[0]*2 + 2, [] ) )
-        continue
+        self.Classify_BlankNode(nodeValueTup)
+
       elif nodeValueTup[2] == 'ThisIsAnEndNode' and pd.isnull(nodeValueTup[3]) and pd.isnull(nodeValueTup[4]) and nodeValueTup[1] == 1.0: 
-        decision = next(iteTup for iteTup in nodeDecisions if int(iteTup[0]) == nodeValueTup[0]) 
-        IDs = dfCurr[idColumn].tolist() 
-        df_Answers.loc[ df_Answers[idColumn].isin(IDs) , className] = decision[1] 
-        if self.printOutput: print ("Class for End-Node=",  decision[1], "\tlen(IDs)=", IDs)
-        if nodeValueTup[0] < maxNodeCount / 2: 
-          dfIDList.append( (nodeValueTup[0]*2 + 1, [] ) )
-          dfIDList.append( (nodeValueTup[0]*2 + 2, [] ) )
+        self.Classify_EndNode(df=dfCurr, df_Answers=df_Answers, nodeValueTup=nodeValueTup)
+
       elif nodeValueTup[0] < maxNodeCount / 2: 
-        if self.printOutput: print ("\tlen(lt)=", len(dfCurr[ dfCurr[nodeValueTup[2]] <= nodeValueTup[3] ]), "\tlen(gt)=", len(dfCurr[ dfCurr[nodeValueTup[2]] > nodeValueTup[3] ]) )
-        dfIDList.append( (nodeValueTup[0]*2 + 1, dfCurr[ dfCurr[nodeValueTup[2]] <= nodeValueTup[3] ][idColumn].tolist() ) ) 
-        dfIDList.append( (nodeValueTup[0]*2 + 2, dfCurr[ dfCurr[nodeValueTup[2]] > nodeValueTup[3] ][idColumn].tolist() ) )  
-        try:  
-          decision = next (itetup for itetup in nodeDecisions if int(itetup[0]) == nodeValueTup[0])
-          if self.printOutput: print ("\tOne of this Node's Daughters is a BlankNode.")
-          if pd.isnull(float(decision[2]) ) and not pd.isnull(float(decision[1]) ):
-            ltIDs = dfCurr[ dfCurr[nodeValueTup[2]] <= nodeValueTup[3] ][idColumn].tolist() 
-            df_Answers.loc[ df_Answers[idColumn].isin(ltIDs) , className] = decision[1] 
-            if self.printOutput: print ("\tClass for LT=", decision[1], "\tlen(ltIDs)=",  len(ltIDs) )
-          elif not pd.isnull(float(decision[2]) ) and pd.isnull(float(decision[1]) ):
-            gtIDs = dfCurr[ dfCurr[nodeValueTup[2]] > nodeValueTup[3] ][idColumn].tolist() 
-            df_Answers.loc[ df_Answers[idColumn].isin(gtIDs) , className] = decision[2] 
-            if self.printOutput: print ("\tClass for GT=", decision[2], "\tlen(gtIDs)=",  len(gtIDs) )
-          else:
-            ltIDs = dfCurr[ dfCurr[nodeValueTup[2]] <= nodeValueTup[3] ][idColumn].tolist() 
-            gtIDs = dfCurr[ dfCurr[nodeValueTup[2]] > nodeValueTup[3] ][idColumn].tolist() 
-            df_Answers.loc[ df_Answers[idColumn].isin(ltIDs) , className] = decision[1] 
-            df_Answers.loc[ df_Answers[idColumn].isin(gtIDs) , className] = decision[2]
-            if self.printOutput: print ("\tClass for LT=", decision[1], "\tlen(ltIDs)=",  len(ltIDs), "\tClass for GT=", decision[2], "\tlen(gtIDs)=",  len(gtIDs) )
-        except StopIteration:  
-          if self.printOutput: print ("Non of this node's daughters are Blank Nodes")
-          continue 
+        self.Classify_NotMaxDepth(df=dfCurr, df_Answers=df_Answers, nodeValueTup=nodeValueTup)
+
       else: 
-        decision = next(iteTup for iteTup in nodeDecisions if int(iteTup[0]) == nodeValueTup[0]) 
-        ltIDs = dfCurr[ dfCurr[nodeValueTup[2]] <= nodeValueTup[3] ][idColumn].tolist() 
-        gtIDs = dfCurr[ dfCurr[nodeValueTup[2]] >  nodeValueTup[3] ][idColumn].tolist() 
-        df_Answers.loc[ df_Answers[idColumn].isin(ltIDs) , className] = decision[1] 
-        df_Answers.loc[ df_Answers[idColumn].isin(gtIDs) , className] = decision[2] 
-        if self.printOutput: print ("\tClass for LT=", decision[1], "\tlen(ltIDs)=",  len(ltIDs), "\tClass for GT=", decision[2], "\tlen(gtIDs)=",  len(gtIDs) )
+        self.Classify_MaxDepth(df=dfCurr, df_Answers=df_Answers, nodeValueTup=nodeValueTup)
+
       del dfCurr 
 
     if self.printOutput: print ("df_Answers=", df_Answers.head(10) )
     df_Answers.to_csv(outputFileName + ".csv", sep=',', index=False) 
 
- 
+  def Classify_BlankNode(self, nodeValueTup=nodeValueTup):
+    '''
+    If node is a BlankNode, then add BlankNodes for daughters.
+    '''
+    if self.printOutput: print ("\tdf=", self.testDFIDs[nodeValueTup[0]][1])
+    if nodeValueTup[0] < maxNodeCount / 2: 
+      self.testDFIDs.append( (nodeValueTup[0]*2 + 1, [] ) )
+      self.testDFIDs.append( (nodeValueTup[0]*2 + 2, [] ) )
+
+  def Classify_EndNode(self, df, df_Answers, nodeValueTup):
+    '''
+    If node is an EndNode, then classify points there and add BlankNode for daughters, if current node is not at the max tree depth
+    '''
+    decision = next(iteTup for iteTup in self.nodeDecisions if int(iteTup[0]) == nodeValueTup[0])
+    IDs = dfCurr[self.idColumn].tolist() 
+    df_Answers.loc[ df_Answers[self.idColumn].isin(IDs) , self.className] = decision[1] 
+    if self.printOutput: print ("Class for End-Node=",  decision[1], "\tlen(IDs)=", IDs)
+    if nodeValueTup[0] < maxNodeCount / 2: 
+      self.testDFIDs.append( (nodeValueTup[0]*2 + 1, [] ) )
+      self.testDFIDs.append( (nodeValueTup[0]*2 + 2, [] ) )
+
+  def Classify_NotMaxDepth(self, df, df_Answers, nodeValueTup):
+    '''
+    If node is not at the max tree depth, then add the split df ID's to self.testDFIDs. Then, check if there
+    is a decision for the LT, GT, or both groups.
+    '''
+    if self.printOutput: print ("\tlen(lt)=", len(dfCurr[ dfCurr[nodeValueTup[2]] <= nodeValueTup[3] ]), "\tlen(gt)=", len(dfCurr[ dfCurr[nodeValueTup[2]] > nodeValueTup[3] ]) )
+    self.testDFIDs.append( (nodeValueTup[0]*2 + 1, dfCurr[ dfCurr[nodeValueTup[2]] <= nodeValueTup[3] ][self.idColumn].tolist() ) )
+    self.testDFIDs.append( (nodeValueTup[0]*2 + 2, dfCurr[ dfCurr[nodeValueTup[2]] >  nodeValueTup[3] ][self.idColumn].tolist() ) )
+    try:  
+      decision = next (itetup for itetup in self.nodeDecisions if int(itetup[0]) == nodeValueTup[0])
+      if self.printOutput: print ("\tOne of this Node's Daughters is a BlankNode.")
+
+      if pd.isnull(float(decision[2]) ) and not pd.isnull(float(decision[1]) ):
+        ltIDs = dfCurr[ dfCurr[nodeValueTup[2]] <= nodeValueTup[3] ][self.idColumn].tolist()  
+        df_Answers.loc[ df_Answers[self.idColumn].isin(ltIDs) , self.className] = decision[1] 
+
+      elif not pd.isnull(float(decision[2]) ) and pd.isnull(float(decision[1]) ):
+        gtIDs = dfCurr[ dfCurr[nodeValueTup[2]] > nodeValueTup[3] ][self.idColumn].tolist() 
+        df_Answers.loc[ df_Answers[self.idColumn].isin(gtIDs) , self.className] = decision[2] 
+
+      else:
+        ltIDs = dfCurr[ dfCurr[nodeValueTup[2]] <= nodeValueTup[3] ][self.idColumn].tolist()
+        gtIDs = dfCurr[ dfCurr[nodeValueTup[2]] > nodeValueTup[3] ][self.idColumn].tolist() 
+        df_Answers.loc[ df_Answers[self.idColumn].isin(ltIDs) , self.className] = decision[1]
+        df_Answers.loc[ df_Answers[self.idColumn].isin(gtIDs) , self.className] = decision[2]
+        if self.printOutput: print ("\tClass for LT=", decision[1], "\tlen(ltIDs)=",  len(ltIDs), "\tClass for GT=", decision[2], "\tlen(gtIDs)=",  len(gtIDs) )
+    except StopIteration:  
+      if self.printOutput: print ("Non of this node's daughters are Blank Nodes")
+
+  def Classify_MaxDepth(self, df, df_Answers, nodeValueTup):
+    '''
+     Given the values at the node at the max depth of the tree, Classify the entries there of the df test set. 
+    '''
+    decision = next(iteTup for iteTup in self.nodeDecisions if int(iteTup[0]) == nodeValueTup[0])
+    ltIDs = dfCurr[ dfCurr[nodeValueTup[2]] <= nodeValueTup[3] ][self.idColumn].tolist() 
+    gtIDs = dfCurr[ dfCurr[nodeValueTup[2]] >  nodeValueTup[3] ][self.idColumn].tolist() 
+    df_Answers.loc[ df_Answers[self.idColumn].isin(ltIDs) , self.className] = decision[1] 
+    df_Answers.loc[ df_Answers[self.idColumn].isin(gtIDs) , self.className] = decision[2] 
+    if self.printOutput: print ("\tClass for LT=", decision[1], "\tlen(ltIDs)=",  len(ltIDs), "\tClass for GT=", decision[2], "\tlen(gtIDs)=",  len(gtIDs) )
+
+
+  def CleanTree(self):
+    '''
+    If you would like to keep the class, but reset the lists of node decisions, ID's, and values.
+    '''
+    self.nodeDFIDs     = []  
+    self.nodeValues    = []  
+    self.nodeDecisions = []  
+     

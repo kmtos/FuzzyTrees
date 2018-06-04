@@ -1,0 +1,7 @@
+Gender map(Sex): 'male'= 1 and 'female'= -1
+Embark is split into several yes/no ( 1/-1 ) columns for every letter (EmbarkIsC): C, Q, S+NaN
+Titles Split into: Mrs.,  Mr.,  Miss.,  Rev., Master., Other
+Fare split into: 0->5, 5->15, 10->40, 40->90, >90
+Cabin is split into several yes/no ( 1/-1 ) columns for every letter it starts with: C, E, G, D, A, B, T, F
+TicketBeginLetter map(Ticket): 1 if Letter is in name, 0 if no letter in name.
+FamilySize = SibSp + Parch

@@ -18,8 +18,8 @@ import scipy.stats as st
 ###################################################################
 def FuzzyMembershipLinear(value, split, splitLength, duality,  previousList, nodeNumber, daughterEndNode=None):
   if daughterEndNode == 'LT': # Checking if the LT node is an end node. If so, keep the membership % for the current node, not the daughter
-    ltNodeNumber = nodeNumber 
     gtNodeNumber = nodeNumber*2 + 2
+    ltNodeNumber = nodeNumber 
   elif daughterEndNode == 'GT': # Checking if hte GT node is an end node. If so, keep the membership % for the current node, not the daughter
     gtNodeNumber = nodeNumber 
     ltNodeNumber = nodeNumber*2 + 1
