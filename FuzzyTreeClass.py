@@ -24,8 +24,8 @@ class FuzzyDT(BDT):
   membership weight. These two weights are separate and must both be used."
   '''
   def __init__(self, idColumn, className, nodeDFIDsFileName, nodeValuesFileName, nodeDecisionsFileName, outputFileName, treeErrorFileName, maxDepth=4, nGiniSplits=10, giniEndVal=0.01,
-               nClasses=2, minSamplesSplit=2, printOutput=True, nEstimators=10, rateOfChange=0.1, colRandomness=0.0, rowRandomness=0.0, isContinuing=False, continuedTreeErrorFile=''
-               fuzziness=.9, fuzzyFunction='linear'):
+               nClasses=2, minSamplesSplit=2, printOutput=True, nEstimators=10, rateOfChange=0.1, colRandomness=0.0, rowRandomness=0.0, writeTree=False, isContinuing=False, 
+               continuedTreeErrorFile='', fuzziness=.9, fuzzyFunction='linear'):
     '''
     Initialize the FuzzyDT, first with the properties of the DecisionTree, then with the properties of the BDT, then with the rest of the elements.
     '''
@@ -221,12 +221,8 @@ class FuzzyDT(BDT):
         if self.printOutput: print ("###########################\n###########################\n  STARTING ESTIMATOR", self.currEst, "\n###########################\n###########################")
         TEMP = self.BuildFuzzyTree(df=dfCurr, df_weights=dfCurr_weights) 
         if TEMP == "ERROR": raise UnboundLocalError("\n\nRunning Ended Early")
-        self.GatherAndWriteFuzzyDecisions(df=dfCurr, df_weights=dfCurr_weights)
+        self.GatherFuzzyDecisions(df=dfCurr, df_weights=dfCurr_weights)
         self.treeError.append( (self.currEst, self.GetTreeError(df=dfCurr, df_weights=dfCurr_weights) ) )
-
-
-
-
         dfCurr_weights = self.AlterFuzzyWeights(df=dfCurr, df_weights=dfCurr_weights, error=next(i[1] for i in self.treeError if i[0] == self.currEst) )
 
         if self.printOutput: print ("BEFORE: df_weights['Weights'].unique()=", df_weights['Weights'].unique() )
@@ -239,20 +235,28 @@ class FuzzyDT(BDT):
             print ("\tlen('Weights' ==", ite, ")=", len(df_weights[ df_weights['Weights'] == ite].index) )
         df_weights['Weights'] = df_weights['Weights'] / df_weights['Weights'].sum(axis=0) 
         if self.printOutput: print ("\n\n####################\nFINAL SCORE FOR TREE #", self.currEst, "is 1-error=", 1-next(i[1] for i in treeError if i[0] == self.currEst),"\n##############")
+        self.allNodeValues.append( (self.currEst, self.nodeValues) )
+        self.allNodeDecisions.append( (selfcurrEst, self.nodeDecisions) )
+        if self.writeTree:
+          self.nodeValuesFileName    =  self.nodeValuesFileName.rstrip('1234567890')    + str(self.currEst)
+          self.nodeDecisionsFileName =  self.nodeDecisionsFileName.rstrip('1234567890') + str(self.currEst)
+          self.WritingNodeValues()
+          self.WriteDecisions(df=df, df_weights=df_weights)
         self.currEst -= 1
         self.CleanTree() 
 
- 
-      # Writing the TreeErrors
-      currTreeErrorFileName =  self.treeErrorFileName + ".csv"
-      if os.path.isfile(currTreeErrorFileName): treeErrorFile = open(currTreeErrorFileName, 'a')
-      else: treeErrorFile = open(currTreeErrorFileName, 'w')
-      treeErrorFileCSV=csv.writer(treeErrorFile)
-      treeErrorFileCSV.writerow(["NumberOfEstimator,TreeErrorAssociatedWithCorrectness"])
-      for tup in self.treeError:
-        treeErrorFileCSV.writerow(tup)
+      if self.writeTree: 
+        # Writing the TreeErrors
+        currTreeErrorFileName =  self.treeErrorFileName + ".csv"
+        if os.path.isfile(currTreeErrorFileName): treeErrorFile = open(currTreeErrorFileName, 'a')
+        else: treeErrorFile = open(currTreeErrorFileName, 'w')
+        treeErrorFileCSV=csv.writer(treeErrorFile)
+        treeErrorFileCSV.writerow(["NumberOfEstimator,TreeErrorAssociatedWithCorrectness"])
+        for tup in self.treeError:
+          treeErrorFileCSV.writerow(tup)
 
     except (KeyboardInterrupt,UnboundLocalError): #If user stops runnig, still save 
+      if self.writeTree:
         currTreeErrorFileName =  self.treeErrorFileName + "_Incomplete.csv"
         if os.path.isfile(currTreeErrorFileName):
           treeErrorFile = open(currTreeErrorFileName, 'a')
@@ -315,7 +319,7 @@ class FuzzyDT(BDT):
 
 
 
-  def ClassifyWithFuzzyTree(self, df_test):
+  def ClassifyWithFuzzyTree(self, df_test, outputFileName):
     '''
     Classifies a test set after have tree built. It iterates through the nodes in the "self.nodeValues" element and propogates the test set entries to their final node location.
     It first checks for EndNodes or BlankNodes. Then, if the node isn't at the maximum depth of the tree, it checks to see if the node has a decision and adds the membership weight
@@ -324,7 +328,7 @@ class FuzzyDT(BDT):
     '''
     print ("\n\n###########################\n Classifying test points with Tree from Make Tree\n###########################")
     df_Answers = df_test.filter([self.idColumn], axis=1)
-    for classVal in uniqueClasses:
+    for classVal in self.uniqueClasses:
       df_test[self.className + "_" + str(classVal)] = 0.0 
     df_test['Memberships'] = [ [(0, 1.0)] for _ in range( len(df_test)) ] 
     df_test['MembershipNodeList'] = [ [0] for _ in range( len(df_test)) ] 
@@ -340,34 +344,34 @@ class FuzzyDT(BDT):
       elif nodeValueTup[2] == 'ThisIsAnEndNode' and pd.isnull(nodeValueTup[3]) and pd.isnull(nodeValueTup[4]) and nodeValueTup[1] == 1.0: 
         decision = next (ite for ite in self.nodeDecisions if int(itetup[0]) == nodeValueTup[0])
         IDs = df_Curr[self.idColumn].tolist()
-        if len(IDs) > 0: self.ClassifyWithFuzzyTre_AddDecisionWeights(df=df_test, decision=str(decision[1]), nodeNumber=nodeValueTup[0], IDs=IDs)
+        if len(IDs) > 0: self.AddDecisionWeights(df=df_test, decision=str(decision[1]), nodeNumber=nodeValueTup[0], IDs=IDs)
 
-      elif nodeValueTup[0] < maxNodeCount / 2: 
+      elif nodeValueTup[0] < self.maxNodes / 2: 
         daughterEndNodeCheck = None 
         try:  
-          decision = next (itetup for itetup in nodeDecisions if int(itetup[0]) == nodeValueTup[0]) 
+          decision = next (itetup for itetup in self.nodeDecisions if int(itetup[0]) == nodeValueTup[0]) 
           if self.printOutput: print ("\tOne of this Node's Daughters is a BlankNode.")
 
           if pd.isnull(float(decision[2]) ) and not pd.isnull(float(decision[1]) ): 
             daughterEndNodeCheck = 'LT'
             ltIDs = df_Curr[ df_Curr[nodeValueTup[2]] <= nodeValueTup[3] ][self.idColumn].tolist() 
             if self.printOutput: print ("\tClass for LT=", decision[1], "\tlen(ltIDs)=",  len(ltIDs) )
-            if len(ltIDs) > 0: self.ClassifyWithFuzzyTre_AddDecisionWeights(df=df_test, decision=str(decision[1]), nodeNumber=nodeValueTup[0], IDs=ltIDs)
+            if len(ltIDs) > 0: self.AddDecisionWeights(df=df_test, decision=str(decision[1]), nodeNumber=nodeValueTup[0], IDs=ltIDs)
 
           elif not pd.isnull(float(decision[2]) ) and pd.isnull(float(decision[1]) ): 
             daughterEndNodeCheck = 'GT'
             gtIDs = df_Curr[ df_Curr[nodeValueTup[2]] > nodeValueTup[3] ][self.idColumn].tolist() 
             if self.printOutput: print ("\tClass for GT=", decision[2], "\tlen(gtIDs)=",  len(gtIDs) )
             if len(gtIDs) > 0: 
-              self.ClassifyWithFuzzyTre_AddDecisionWeights(df=df_test, decision=str(decision[1]), nodeNumber=nodeValueTup[0], IDs=gtIDs)
+              self.AddDecisionWeights(df=df_test, decision=str(decision[1]), nodeNumber=nodeValueTup[0], IDs=gtIDs)
                    
           else:   
             daughterEndNodeCheck = 'BOTH'
             ltIDs = df_Curr[ df_Curr[nodeValueTup[2]] <= nodeValueTup[3] ][self.idColumn].tolist() 
             gtIDs = df_Curr[ df_Curr[nodeValueTup[2]] > nodeValueTup[3] ][self.idColumn].tolist() 
             if self.printOutput: print ("\tClass for LT=", decision[1], "\tlen(ltIDs)=",  len(ltIDs), "\tClass for GT=", decision[2], "\tlen(gtIDs)=",  len(gtIDs) )
-            if len(ltIDs) > 0: self.ClassifyWithFuzzyTre_AddDecisionWeights(df=df_test, decision=str(decision[1]), nodeNumber=nodeValueTup[0], IDs=ltIDs)
-            if len(gtIDs) > 0: self.ClassifyWithFuzzyTre_AddDecisionWeights(df=df_test, decision=str(decision[1]), nodeNumber=nodeValueTup[0], IDs=gtIDs) 
+            if len(ltIDs) > 0: self.AddDecisionWeights(df=df_test, decision=str(decision[1]), nodeNumber=nodeValueTup[0], IDs=ltIDs)
+            if len(gtIDs) > 0: self.AddDecisionWeights(df=df_test, decision=str(decision[1]), nodeNumber=nodeValueTup[0], IDs=gtIDs) 
         except StopIteration:
           print ("Non of this node's daughters are Blank Nodes")
         df_Curr['Memberships'] = df_Curr.apply(lambda row: 
@@ -379,12 +383,12 @@ class FuzzyDT(BDT):
         df_test.loc[ df_test[self.idColumn].isin(IDs), 'MembershipNodeList'] = df_Curr['MembershipNodeList'] 
 
       else: 
-        decision = next(iteTup for iteTup in nodeDecisions if int(iteTup[0]) == nodeValueTup[0]) 
+        decision = next(iteTup for iteTup in self.nodeDecisions if int(iteTup[0]) == nodeValueTup[0]) 
         ltIDs = df_Curr[ df_Curr[nodeValueTup[2]] <= nodeValueTup[3] ][self.idColumn].tolist() 
         gtIDs = df_Curr[ df_Curr[nodeValueTup[2]] > nodeValueTup[3] ][self.idColumn].tolist() 
         if self.printOutput: print ("\tClass for LT=", decision[1], "\tlen(ltIDs)=",  len(ltIDs), "\tClass for GT=", decision[2], "\tlen(gtIDs)=",  len(gtIDs) )
-        if len(ltIDs) > 0: self.ClassifyWithFuzzyTre_AddDecisionWeights(df=df_test, decision=str(decision[1]), nodeNumber=nodeValueTup[0], IDs=ltIDs)
-        if len(gtIDs) > 0: self.ClassifyWithFuzzyTre_AddDecisionWeights(df=df_test, decision=str(decision[1]), nodeNumber=nodeValueTup[0], IDs=gtIDs)
+        if len(ltIDs) > 0: self.AddDecisionWeights(df=df_test, decision=str(decision[1]), nodeNumber=nodeValueTup[0], IDs=ltIDs)
+        if len(gtIDs) > 0: self.AddDecisionWeights(df=df_test, decision=str(decision[1]), nodeNumber=nodeValueTup[0], IDs=gtIDs)
 
     #Writing the answers out
     df_Answers[self.className] = -1
@@ -398,154 +402,105 @@ class FuzzyDT(BDT):
     df_Answers[[self.idColumn, self.className]].to_csv(outputFileName + ".csv", sep=',', index=False) 
 
 
-  def ClassifyWithFuzzyTre_AddDecisionWeights(self, df, decision, nodeNumber, IDs):
+  def AddDecisionWeights(self, df, decision, nodeNumber, IDs, alpha=None):
     '''
     Adds the membership weight of the test set entries at an EndNode to the decision already found for that node. 
     '''
     df_Changed = df[ df[self.idColumn].isin(IDs)].copy() 
     df_Changed[self.className + "_" + decision] = df_Changed.apply(lambda row: 
-                    FuzzyDecisionScoreUpdate( previous=row[self.className + "_" + decision], membershipList=row['Memberships'], nodeNumber=nodeNumber), axis=1)
+                    FuzzyDecisionScoreUpdate( previous=row[self.className + "_" + decision], membershipList=row['Memberships'], nodeNumber=nodeNumber, alpha=alpha), axis=1)
     df.loc[ df[self.idColumn].isin(IDs), self.className + "_" + decision] = df_Changed[self.className + "_" + decision]
 
 
+  def ClassifyWithBoostedFuzzyTree(self, df_test, outputFileName):
+    '''
+    Classifies a test set with a fully built boosted decision tree. It reads the nodeValues and nodeDecisions of each node via a written file. It checks for nodes that are
+    BlankNodes, then EndNodes, and then looks to see if the node is at the maximum depth. If not, then look for a decision at one of the nodes, and propogate the entries of 
+    the test set through to the subsequent nodes.
+    '''
+    if self.printOutput: print ("\n\n#################################################\n Classifying test points with Tree from Make Tree\n#################################################")
+    df_Answers = df_test.filter([self.idColumn], axis=1)
+    df_test[self.className + "_total"] = 0.0 
+    for classVal in self.uniqueClasses:
+      df_test[self.className + "_" + str(classVal)] = 0.0 
+    self.currEst = 1
+    while currEst <= nEstimators: 
+      df_test['Memberships'] = [ [(0, 1.0)] for _ in range( len(df_test)) ] 
+      df_test['MembershipNodeList'] = [ [0] for _ in range( len(df_test)) ] 
+      self.nodeDecisions = next(decTup[1] for decTup in self.allNodeDecisions if decTup[0] == self.currEst)
+      self.nodeValues    = next(valtup[1] for valTup in self.allNodeValues    if valTup[0] == self.currEst)
+      currErrorTup = next(iteTup for iteTup in self.treeError if int(iteTup[0]) == currEst)
+      alpha = .5 * math.log1p((1 - float(currErrorTup[1]) ) / float(currErrorTup[1]) ) 
+      df_test[self.className + "_total"] += alpha
+      if self.printOutput: print ("currEst=", currEst, "\talpha=", alpha, "\tcurrErrorTup=", currErrorTup, "\ndf_test[self.classNames]=", df_test[[self.className + "_0", self.className + "_total"]])
 
-
-
-
-  
-  ####################################################################
-  # Given a final Tree described by the nodes and their tple values
-  # described above and the decisions of those nodes,  make decisions
-  # of a set of points in a DF
-  ####################################################################
-  def ClassifyWithBoostedFuzzyTree(df_test, nEstimators, className, idColumn, maxDepth, duality, uniqueClasses, treeErrorFileName, outputFileName, nodeDecisionsFileName, nodeValuesFileName):
-    print ("\n\n########################################################################\n Classifying test points with Tree from Make Tree\n########################################################################")
-    df_Answers = df_test.filter([idColumn], axis=1)
-    df_test[className + "_total"] = 0.0 # Total avaliable decision weight based upon the alphas
-    for classVal in uniqueClasses:
-      df_test[className + "_" + str(classVal)] = 0.0 # Create new column for sum of alpha's for each unique className value
-    with open(treeErrorFileName + ".csv") as treeErrorFile:
-      treeErrorFileReader = csv.reader(treeErrorFile)
-      next(treeErrorFileReader)
-      treeError = [tuple(line) for line in treeErrorFileReader]
-    currEst = 1
-    while currEst <= nEstimators: # Loop over the nEstimators number of trees in boost
-      df_test['Memberships'] = [ [(0, 1.0)] for _ in range( len(df_test)) ] # Initialize all points to be a part of node 0 wiht complete percent membership there
-      df_test['MembershipNodeList'] = [ [0] for _ in range( len(df_test)) ] # Initialize all points to have their list of nodes they are a part of be only node 0
-      nodeValuesFileName =  nodeValuesFileName.rstrip('1234567890') + str(currEst)
-      nodeDecisionsFileName =  nodeDecisionsFileName.rstrip('1234567890') + str(currEst)
-      with open(nodeDecisionsFileName + ".csv") as nodeDecisionsFile:
-        nodeDecisionsFileReader = csv.reader(nodeDecisionsFile)
-        next(nodeDecisionsFileReader)
-        nodeDecisions = [tuple(line) for line in nodeDecisionsFileReader]
-      with open(nodeValuesFileName + ".csv") as nodeValuesFile:
-        nodeValuesFileReader = csv.reader(nodeValuesFile)
-        next(nodeValuesFileReader)
-        nodeValues = [tuple(line) for line in nodeValuesFileReader]
-   
-      currErrorTup = next(iteTup for iteTup in treeError if int(iteTup[0]) == currEst)
-      alpha = .5 * math.log1p((1 - float(currErrorTup[1]) ) / float(currErrorTup[1]) ) # exponent factor for weight of decision 
-      df_test[className + "_total"] += alpha
-      print ("currEst=", currEst, "\talpha=", alpha, "\tcurrErrorTup=", currErrorTup, "\ndf_test[classNames]=", df_test[[className + "_0", className + "_1", className + "_total"]])
-      maxNodeCount = 0
-      for i in range(1,maxDepth+1): maxNodeCount += 2**i # Get the max number of nodes based upon maxDepth  
-      for ite in nodeValues: #Iterate through the nodes
-        nodeValueTup = (int(ite[0]),  float(ite[1]), ite[2], float(ite[3]), float(ite[4])) # The File stores all info as strings. Cleaner to reassing type now, not every instance.
-        print ("\n\tnodeValueTup=", nodeValueTup )
-        df_Curr = df_test[ df_test['MembershipNodeList'].apply(lambda x: True if nodeValueTup[0] in x else False) ].copy() # Get the nodes that have a membership in current node number
+      for ite in nodeValues: 
+        if self.printOutput: print ("\n\tnodeValueTup=", nodeValueTup )
+        df_Curr = df_test[ df_test['MembershipNodeList'].apply(lambda x: True if nodeValueTup[0] in x else False) ].copy() 
     
-        if pd.isnull(nodeValueTup[3]) and pd.isnull(nodeValueTup[4]) and nodeValueTup[2] == '' and pd.isnull(nodeValueTup[1]): # If decision of node from MakeTree is blank, then skip
-          print ("\tlen(df)=", len(df_Curr.index) )
-          continue
-        elif nodeValueTup[2] == 'ThisIsAnEndNode' and pd.isnull(nodeValueTup[3]) and pd.isnull(nodeValueTup[4]) and nodeValueTup[1] == 1.0: #If decision of node from MakeTree is an EndNode, then proceed
-          decision = next (itetup for itetup in nodeDecisions if int(itetup[0]) == nodeValueTup[0])  # Try to find decision. If no decision, node's daugthers are not blank nodes. Proceed to excpetion
-          IDs = df_Curr[idColumn].tolist() # Get the IDs of the points at this node
-          if len(IDs) > 0: # Check if there are some test points  here
-            df_test_Changed = df_test[ df_test[idColumn].isin(IDs)].copy() # Create dummy df. Below put the precent membership, weighted by alpha, towards the decision of that node. 
-            df_test_Changed[className + "_" + str(decision[1])] = df_test_Changed.apply(lambda row: 
-                                BoostedFuzzyDecisionScoreUpdate(  previous=row[className + "_" + str(decision[1])], membershipList=row['Memberships'], nodeNumber=nodeValueTup[0], alpha=alpha), axis=1)
-            df_test.loc[ df_test[idColumn].isin(IDs), className + "_" + str(decision[1])] = df_test_Changed[className + "_" + str(decision[1])] # Set updated decisions to non-copy df_test
-        elif nodeValueTup[0] < maxNodeCount / 2: # If element isn't an EndNode and also not at the furthest depth, then proceed
+        if pd.isnull(nodeValueTup[3]) and pd.isnull(nodeValueTup[4]) and nodeValueTup[2] == '' and pd.isnull(nodeValueTup[1]): 
+          if self.printOutput: print ("\tlen(df)=", len(df_Curr.index) )
+
+        elif nodeValueTup[2] == 'ThisIsAnEndNode' and pd.isnull(nodeValueTup[3]) and pd.isnull(nodeValueTup[4]) and nodeValueTup[1] == 1.0: 
+          decision = next (itetup for itetup in self.nodeDecisions if int(itetup[0]) == nodeValueTup[0])  
+          IDs = df_Curr[self.idColumn].tolist() 
+          if len(IDs) > 0:  self.AddDecisionWeights(df=df_test, decision=str(decision[1]), nodeNumber=nodeValueTup[0], IDs=IDs, alpha=alpha)
+
+        elif nodeValueTup[0] < self.maxNodes / 2: 
           daughterEndNodeCheck = None
-          try:  # This sees if the decision of a node is already added. From a sister BlankNode
-            decision = next (itetup for itetup in nodeDecisions if int(itetup[0]) == nodeValueTup[0])
-            print ("\tOne of this Node's Daughters is a BlankNode.")
+          try:  
+            decision = next (itetup for itetup in self.nodeDecisions if int(itetup[0]) == nodeValueTup[0])
+            if self.printOutput: print ("\tOne of this Node's Daughters is a BlankNode.")
+
             if pd.isnull(float(decision[2]) ) and not pd.isnull(float(decision[1]) ):
               daughterEndNodeCheck = 'LT'
-              ltIDs = df_Curr[ df_Curr[nodeValueTup[2]] <= nodeValueTup[3] ][idColumn].tolist() # Get the df_test ID's in the daughter LT leaf of current Node
-              if len(ltIDs) > 0: # Check if there are some test points  here
-                df_test_Changed = df_test[ df_test[idColumn].isin(ltIDs)].copy() # Create dummy df. Below put the precent membership, weighted by alpha, towards the decision of that node
-                df_test_Changed[className + "_" + str(decision[1])] = df_test_Changed.apply(lambda row: 
-                                BoostedFuzzyDecisionScoreUpdate(  previous=row[className + "_" + str(decision[1])], membershipList=row['Memberships'], nodeNumber=nodeValueTup[0], alpha=alpha), axis=1)
-                df_test.loc[ df_test[idColumn].isin(ltIDs), className + "_" + str(decision[1])] = df_test_Changed[className + "_" + str(decision[1])] # Set updated decisions to non-copy df_test
-              print ("\tClass for LT=", decision[1], "\tlen(ltIDs)=",  len(ltIDs) )
+              ltIDs = df_Curr[ df_Curr[nodeValueTup[2]] <= nodeValueTup[3] ][self.idColumn].tolist() 
+              if self.printOutput: print ("\tClass for LT=", decision[1], "\tlen(ltIDs)=",  len(ltIDs) )
+              if len(ltIDs) > 0: self.AddDecisionWeights(df=df_test, decision=str(decision[1]), nodeNumber=nodeValueTup[0], IDs=ltIDs, alpha=alpha)
+
             elif not pd.isnull(float(decision[2]) ) and pd.isnull(float(decision[1]) ):
               daughterEndNodeCheck = 'GT'
-              gtIDs = df_Curr[ df_Curr[nodeValueTup[2]] > nodeValueTup[3] ][idColumn].tolist() # Get the df_test ID's in the daughter LT leaf of current Node
-              if len(gtIDs) > 0: # Check if there are some test points  here
-                df_test_Changed = df_test[ df_test[idColumn].isin(gtIDs)].copy() # Create dummy df. Below put the precent membership, weighted by alpha, towards the decision of that node
-                df_test_Changed[className + "_" + str(decision[2])] = df_test_Changed.apply(lambda row: 
-                                BoostedFuzzyDecisionScoreUpdate(  previous=row[className + "_" + str(decision[2])], membershipList=row['Memberships'], nodeNumber=nodeValueTup[0], alpha=alpha), axis=1)
-                df_test.loc[ df_test[idColumn].isin(gtIDs), className + "_" + str(decision[2])] = df_test_Changed[className + "_" + str(decision[2])] # Set updated decisions to non-copy df_test
-              print ("\tClass for GT=", decision[2], "\tlen(gtIDs)=",  len(gtIDs) )
+              gtIDs = df_Curr[ df_Curr[nodeValueTup[2]] > nodeValueTup[3] ][self.idColumn].tolist() 
+              if self.printOutput: print ("\tClass for GT=", decision[2], "\tlen(gtIDs)=",  len(gtIDs) )
+              if len(gtIDs) > 0: self.AddDecisionWeights(df=df_test, decision=str(decision[1]), nodeNumber=nodeValueTup[0], IDs=gtIDs, alpha=alpha) 
+
             else:
               daughterEndNodeCheck = 'BOTH'
-              ltIDs = df_Curr[ df_Curr[nodeValueTup[2]] <= nodeValueTup[3] ][idColumn].tolist() # Get the df_test ID's in the daughter LT leaf of current Node
-              gtIDs = df_Curr[ df_Curr[nodeValueTup[2]] > nodeValueTup[3] ][idColumn].tolist() # Get the df_test ID's in the daughter LT leaf of current Node
-              if len(ltIDs) > 0: # Check if there are some test points  here
-                df_test_Changed_lt = df_test[ df_test[idColumn].isin(ltIDs)].copy() # Create dummy df. Below put the precent membership, weighted by alpha, towards the decision of that node
-                df_test_Changed_lt[className+"_"+str(decision[1])] = df_test_Changed_lt.apply(lambda row: 
-                                   BoostedFuzzyDecisionScoreUpdate( previous=row[className + "_" + str(decision[1])], membershipList=row['Memberships'], nodeNumber=nodeValueTup[0], alpha=alpha), axis=1)
-                df_test.loc[ df_test[idColumn].isin(ltIDs), className + "_" + str(decision[1])] = df_test_Changed_lt[className + "_" + str(decision[1])] # Set updated decisions to non-copy df_test
-              if len(gtIDs) > 0: # Check if there are some test points  here 
-                df_test_Changed_gt = df_test[ df_test[idColumn].isin(gtIDs)].copy() # Create dummy df. Below put the precent membership, weighted by alpha, towards the decision of that node
-                df_test_Changed_gt[className+"_"+str(decision[2])] = df_test_Changed_gt.apply(lambda row: 
-                                   BoostedFuzzyDecisionScoreUpdate( previous=row[className + "_" + str(decision[2])], membershipList=row['Memberships'], nodeNumber=nodeValueTup[0], alpha=alpha), axis=1)
-                df_test.loc[ df_test[idColumn].isin(gtIDs), className + "_" + str(decision[2])] = df_test_Changed_gt[className + "_" + str(decision[2])] # Set updated decisions to non-copy df_test
-              print ("\tClass for LT=", decision[1], "\tlen(ltIDs)=",  len(ltIDs), "\tClass for GT=", decision[2], "\tlen(gtIDs)=",  len(gtIDs) )
+              ltIDs = df_Curr[ df_Curr[nodeValueTup[2]] <= nodeValueTup[3] ][self.idColumn].tolist() 
+              gtIDs = df_Curr[ df_Curr[nodeValueTup[2]] > nodeValueTup[3] ][self.idColumn].tolist() 
+              if self.printOutput: print ("\tClass for LT=", decision[1], "\tlen(ltIDs)=",  len(ltIDs), "\tClass for GT=", decision[2], "\tlen(gtIDs)=",  len(gtIDs) )
+              if len(ltIDs) > 0: self.AddDecisionWeights(df=df_test, decision=str(decision[1]), nodeNumber=nodeValueTup[0], IDs=ltIDs, alpha=alpha) 
+              if len(gtIDs) > 0: self.AddDecisionWeights(df=df_test, decision=str(decision[1]), nodeNumber=nodeValueTup[0], IDs=gtIDs, alpha=alpha) 
+
           except StopIteration:
-            print ("Non of this node's daughters are Blank Nodes")
-          print ("BEFORE: df_Curr[['MembershipNodeList', 'Memberships']].head(100)=", df_Curr[['MembershipNodeList', 'Memberships']].head(100) )
+            if self.printOutput: print ("Non of this node's daughters are Blank Nodes")
+          if self.printOutput: print ("BEFORE SPLITTING MEMB.: df_Curr[['MembershipNodeList', 'Memberships']].head(20)=", df_Curr[['MembershipNodeList', 'Memberships']].head(20) )
           df_Curr['Memberships'] = df_Curr.apply(lambda row: 
                                            FuzzyMembershipLinear( value=row[nodeValueTup[2]], split=nodeValueTup[3], splitLength=nodeValueTup[4], duality=duality,
-                                           previousList=row['Memberships'], nodeNumber=nodeValueTup[0], daughterEndNode=daughterEndNodeCheck ), axis=1 ) # Sets points membership via linear range
-          df_Curr['MembershipNodeList'] = df_Curr.apply(lambda row: FuzzyUpdateMembershipNodeList(row['Memberships']), axis=1) # Updates Membership's Node list depending on the points membership
-          IDs = df_Curr[idColumn].tolist() # Get the df_test ID's in the
-          df_test.loc[ df_test[idColumn].isin(IDs), 'Memberships'] = df_Curr['Memberships']  # Update df_test 'Membership' with df_Curr's values
-          df_test.loc[ df_test[idColumn].isin(IDs), 'MembershipNodeList'] = df_Curr['MembershipNodeList'] #Update df_test 'MembershipNodeList' with df_Curr's value
-          print ("AFTER: df_Curr[['MembershipNodeList','Memberships']].head(100)=", df_Curr[['MembershipNodeList', 'Memberships']].head(100) )
-        else: # If not an EndNode, BlankNode, or a node NOT at the max depth, then get decisions there
-          decision = next(iteTup for iteTup in nodeDecisions if int(iteTup[0]) == nodeValueTup[0]) # Get decision of Make Tree at node
-          ltIDs = df_Curr[ df_Curr[nodeValueTup[2]] <= nodeValueTup[3] ][idColumn].tolist() # Get the df_test ID's in the daughter LT leaf of current Node
-          gtIDs = df_Curr[ df_Curr[nodeValueTup[2]] > nodeValueTup[3] ][idColumn].tolist() # Get the df_test ID's in the daughter LT leaf of current Node
-          if len(ltIDs) > 0: # Check if there are some test points  here
-            df_test_Changed_lt = df_test[ df_test[idColumn].isin(ltIDs)].copy() # Create dummy df. Below put the precent membership, weighted by alpha, towards the decision of that node
-            df_test_Changed_lt[className+ "_" + str(decision[1])] = df_test_Changed_lt.apply(lambda row: 
-                               BoostedFuzzyDecisionScoreUpdate(  previous=row[className + "_" + str(decision[1])], membershipList=row['Memberships'], nodeNumber=nodeValueTup[0], alpha=alpha), axis=1)
-            df_test.loc[ df_test[idColumn].isin(ltIDs), className + "_" + str(decision[1])] = df_test_Changed_lt[className + "_" + str(decision[1])] # Set updated decisions to non-copy df_test
-          if len(gtIDs) > 0: # Check if there are some test points  here
-            df_test_Changed_gt = df_test[ df_test[idColumn].isin(gtIDs)].copy() # Create dummy df. Below put the precent membership, weighted by alpha, towards the decision of that node
-            df_test_Changed_gt[className+ "_" + str(decision[2])] = df_test_Changed_gt.apply(lambda row: 
-                               BoostedFuzzyDecisionScoreUpdate(  previous=row[className + "_" + str(decision[2])], membershipList=row['Memberships'], nodeNumber=nodeValueTup[0], alpha=alpha), axis=1)
-            df_test.loc[ df_test[idColumn].isin(gtIDs), className + "_" + str(decision[2])] = df_test_Changed_gt[className + "_" + str(decision[2])] # Set updated decisions to non-copy df_test
-          print ("\tClass for LT=", decision[1], "\tlen(ltIDs)=",  len(ltIDs), "\tClass for GT=", decision[2], "\tlen(gtIDs)=",  len(gtIDs) )
-  
+                                           previousList=row['Memberships'], nodeNumber=nodeValueTup[0], daughterEndNode=daughterEndNodeCheck ), axis=1 ) 
+          df_Curr['MembershipNodeList'] = df_Curr.apply(lambda row: FuzzyUpdateMembershipNodeList(row['Memberships']), axis=1) 
+          IDs = df_Curr[self.idColumn].tolist() 
+          df_test.loc[ df_test[self.idColumn].isin(IDs), 'Memberships'] = df_Curr['Memberships']  
+          df_test.loc[ df_test[self.idColumn].isin(IDs), 'MembershipNodeList'] = df_Curr['MembershipNodeList'] 
+          if self.printOutput: print ("AFTER SPLITTING MEMB.: df_Curr[['MembershipNodeList','Memberships']].head(20)=", df_Curr[['MembershipNodeList', 'Memberships']].head(20) )
+        else: 
+          decision = next(iteTup for iteTup in self.nodeDecisions if int(iteTup[0]) == nodeValueTup[0]) 
+          ltIDs = df_Curr[ df_Curr[nodeValueTup[2]] <= nodeValueTup[3] ][self.idColumn].tolist() 
+          gtIDs = df_Curr[ df_Curr[nodeValueTup[2]] > nodeValueTup[3] ][self.idColumn].tolist() 
+          if self.printOutput: print ("\tClass for LT=", decision[1], "\tlen(ltIDs)=",  len(ltIDs), "\tClass for GT=", decision[2], "\tlen(gtIDs)=",  len(gtIDs) )
+          if len(ltIDs) > 0: self.AddDecisionWeights(df=df_test, decision=str(decision[1]), nodeNumber=nodeValueTup[0], IDs=ltIDs)
+          if len(gtIDs) > 0: self.AddDecisionWeights(df=df_test, decision=str(decision[1]), nodeNumber=nodeValueTup[0], IDs=gtIDs)
       currEst += 1
-      nodeDecisionsFile.close()
-      del nodeDecisionsFileReader
-      nodeValuesFile.close()
-      del nodeValuesFileReader
-  
   
     #Writing the answers out
-    df_Answers[className] = -1
-    df_Answers[className + "_probability"] = -1
-    for classVal in uniqueClasses:
-      print ("classVal=", classVal, "\ndf_test[className + '_' + str(classVal):\n", df_test[className + "_" + str(classVal)] )
-      df_test[className + "_" + str(classVal)] = df_test[className + "_" + str(classVal)] / df_test[className + "_total"] # Normalizing sums to total, to make a probabilit
-      df_Answers[className + "_" + str(classVal)] = df_test[className + "_" + str(classVal)]
-      df_Answers.loc[ df_Answers[className + "_" + str(classVal)] > df_Answers[className], className] = classVal # if current classVal prob is greater, reassign answer to the classVal
-      df_Answers.loc[ df_Answers[className] == classVal, className + "_probability"] = df_Answers[className + "_" + str(classVal)] # If current classVal prob got changed, reassign probab
-    df_Answers.to_csv(outputFileName + "_Prob_Frac_ExtraInfo.csv", sep=',', index=False) #Write out the answers with all answer information
-    df_Answers[[idColumn, className]].to_csv(outputFileName + ".csv", sep=',', index=False) #Write out the answers
+    df_Answers[self.className] = -1
+    df_Answers[self.className + "_probability"] = -1
+    for classVal in self.uniqueClasses:
+      if self.printOutput: print ("classVal=", classVal, "\ndf_test[self.className + '_' + str(classVal):\n", df_test[self.className + "_" + str(classVal)] )
+      df_test[self.className + "_" + str(classVal)] = df_test[self.className + "_" + str(classVal)] / df_test[self.className + "_total"] 
+      df_Answers[self.className + "_" + str(classVal)] = df_test[self.className + "_" + str(classVal)]
+      df_Answers.loc[ df_Answers[self.className + "_" + str(classVal)] > df_Answers[self.className], self.className] = classVal 
+      df_Answers.loc[ df_Answers[self.className] == classVal, self.className + "_probability"] = df_Answers[self.className + "_" + str(classVal)] 
+    df_Answers.to_csv(outputFileName + "_Prob_Frac_ExtraInfo.csv", sep=',', index=False) 
+    df_Answers[[self.idColumn, self.className]].to_csv(outputFileName + ".csv", sep=',', index=False) 
   

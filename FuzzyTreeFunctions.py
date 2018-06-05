@@ -78,13 +78,6 @@ def FuzzyUpdateMembershipNodeList(membershipList):
   '''
   return [tup[0] for tup in membershipList]
 
-def FuzzyDecisionScoreUpdate(previous, membershipList, nodeNumber):
-  '''
-  This adds the fraction of memebership at a node to the previous amount of a column specified in the calling.
-  '''
-  nodeTup = [tup for tup in membershipList if int(tup[0]) == int(nodeNumber)] 
-  return previous + nodeTup[0][1]  
-
 def ChangeWeightWithRow(weight, moreOrLess, memberships, alpha, nodeNumber):
   '''
   This changes the weight of the entry in the dataframe. "weight" is the current weight. "moreOrLess" is the direction in which the weight is changed. "nodeTup" is a
@@ -93,9 +86,12 @@ def ChangeWeightWithRow(weight, moreOrLess, memberships, alpha, nodeNumber):
   nodeTup = [tup for tup in memberships if int(tup[0]) == int(nodeNumber) ]
   return weight * math.exp(alpha * moreOrLess * nodeTup[0][1])
 
-
-def BoostedFuzzyDecisionScoreUpdate(previous, membershipList, nodeNumber, alpha):
+def FuzzyDecisionScoreUpdate(previous, membershipList, nodeNumber, alpha):
+  '''
+  This adds the fraction of memebership at a node to the previous amount of a classification value column specified in the calling. The alpha is for boosted Fuzzy Decision
+  Trees. If alpha == None, then update as a single Fuzzy Decision Tree
+  '''
   nodeTup = [tup for tup in membershipList if int(tup[0]) == int(nodeNumber)] 
-  return previous + nodeTup[0][1] * alpha  
-
+  if alpha == None: return previous + nodeTup[0][1]  
+  else: return previous + nodeTup[0][1] * alpha
 

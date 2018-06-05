@@ -17,7 +17,7 @@ class BDT(DecisionTree):
   '''
 
   def __init__(self, idColumn, className, nodeDFIDsFileName, nodeValuesFileName, nodeDecisionsFileName, outputFileName, treeErrorFileName, maxDepth=4, nGiniSplits=10, giniEndVal=0.01, 
-               minSamplesSplit=2, printOutput=True, nEstimators=10, rateOfChange=0.1, colRandomness=0.0, rowRandomness=0.0, isContinuing=False, continuedTreeErrorFile=''):
+               minSamplesSplit=2, printOutput=True, nEstimators=10, rateOfChange=0.1, colRandomness=0.0, rowRandomness=0.0, writeTree=False, isContinuing=False, continuedTreeErrorFile=''):
     '''
     Initialize the BDT, first with the properties of the DecisionTree, then with the rest of the elements.
     '''
@@ -31,8 +31,11 @@ class BDT(DecisionTree):
     if rowRandomness >= 0.0 and rowRandomness < 1.0: self.rowRandomness = rowRandomness # The fraction of datafram entries to be left out to induce randomness
     else: self.rowRandomness = 0
     self.treeErrorFileName = treeErrorFileName # The output file name
+    self.writeTr3e         = writeTre3         # Bool for if you want to write out all of the nodeValues and nodeDecisions for the nEstimators
     self.isContinuing      = isContinuing      # Boolean stating if this is a continuation of a previous premature ending of running a BDT
     self.treeError         = []                # List containing the tree estimator and it's error
+    self.allNodeValues     = []                # List of tuples where tuple = (nEstimator, nodeValues for nEstimator)
+    self.allNodeDecisions  = []                # List of tuples where tuple = (nEstimator, nodeDecisions for nEstimator)
     if self.isContinuing == True and self.lastCompletedEstimator != '' and lastCompletedEstimator < self.nEstimators: 
       with open(continuedTreeErrorFile= + ".csv") as treeErrorFile:
         treeErrorFileReader = csv.reader(treeErrorFile)
@@ -59,12 +62,10 @@ class BDT(DecisionTree):
         dfCurr = dfCurr.sample( math.ceil(len(dfCurr.index) * (1-rowRandomness) ) )
         dfCurr_weights = df_weights[ df_weights[self.idColumn].isin(dfCurr[self.idColumn].tolist() )].copy()
 
-        self.nodeDecisionsFileName = self.nodeDecisionsFileName.rstrip('1234567890') + str(self.currEst) 
-        self.nodeValuesFileName    = self.nodeValuesFileName.rstrip('1234567890')    + str(self.currEst)
         if self.printOutput: print ("###########################\n###########################\n  STARTING ESTIMATOR", self.currEst, "\n###########################\n###########################")
         TEMP = self.BuildTree(df=dfCurr, df_weights=dfCurr_weights) 
         if TEMP == "ERROR": raise UnboundLocalError("\n\nRunning Ended Early")
-        self.GatherAndWriteDecisions(df=dfCurr, df_weightsdfCurr_weights)
+        self.GatherDecisions(df=dfCurr, df_weightsdfCurr_weights)
         self.treeError.append( (self.currEst, self.GetTreeError(df=dfCurr, df_weights=dfCurr_weights ) ) )
         dfCurr_weights = self.AlterWeights(df=dfCurr, df_weights=dfCurr_weights, error=next(i[1] for i in treeError if i[0] == self.currEst) ) 
 
@@ -78,20 +79,29 @@ class BDT(DecisionTree):
             print ("\tlen('Weights' ==", ite, ")=", len(df_weights[ df_weights['Weights'] == ite].index) )
         df_weights['Weights'] = df_weights['Weights'] / df_weights['Weights'].sum(axis=0) 
         if self.printOutput: print ("\n\n####################\nFINAL SCORE FOR TREE #", self.currEst, "is 1-error=", 1-next(i[1] for i in treeError if i[0] == self.currEst),"\n##############")
+        self.allNodeValues.append( (self.currEst, self.nodeValues) )
+        self.allNodeDecisions.append( (selfcurrEst, self.nodeDecisions) )
+        if self.writeTree:
+          self.nodeValuesFileName    =  self.nodeValuesFileName.rstrip('1234567890')    + str(self.currEst)
+          self.nodeDecisionsFileName =  self.nodeDecisionsFileName.rstrip('1234567890') + str(self.currEst)
+          self.WritingNodeValues()
+          self.WriteDecisions(df=df, df_weights=df_weights)
         self.currEst -= 1 
         self.CleanTree()
 
     
-      # Writing the TreeErrors
-      currTreeErrorFileName =  self.treeErrorFileName + ".csv"
-      if os.path.isfile(currTreeErrorFileName): treeErrorFile = open(currTreeErrorFileName, 'a')
-      else: treeErrorFile = open(currTreeErrorFileName, 'w')
-      treeErrorFileCSV=csv.writer(treeErrorFile)
-      treeErrorFileCSV.writerow(["NumberOfEstimator,TreeErrorAssociatedWithCorrectness"])
-      for tup in self.treeError:
-        treeErrorFileCSV.writerow(tup)
+      if self.writeTree:
+        # Writing the TreeErrors
+        currTreeErrorFileName =  self.treeErrorFileName + ".csv"
+        if os.path.isfile(currTreeErrorFileName): treeErrorFile = open(currTreeErrorFileName, 'a')
+        else: treeErrorFile = open(currTreeErrorFileName, 'w')
+        treeErrorFileCSV=csv.writer(treeErrorFile)
+        treeErrorFileCSV.writerow(["NumberOfEstimator,TreeErrorAssociatedWithCorrectness"])
+        for tup in self.treeError:
+          treeErrorFileCSV.writerow(tup)
   
     except (KeyboardInterrupt,UnboundLocalError): #If user stops runnig, still save 
+      if self.writeTree:
         currTreeErrorFileName =  self.treeErrorFileName + "_Incomplete.csv"
         if os.path.isfile(currTreeErrorFileName): 
           treeErrorFile = open(currTreeErrorFileName, 'a')
@@ -181,23 +191,14 @@ class BDT(DecisionTree):
 
     while self.currEst <= self.nEstimators: 
       if self.printOutput: print ("currEst=", self.currEst)
-      self.nodeValuesFileName    =  self.nodeValuesFileName.rstrip('1234567890')    + str(self.currEst)
-      self.nodeDecisionsFileName =  self.nodeDecisionsFileName.rstrip('1234567890') + str(self.currEst)
-      with open(self.nodeDecisionsFileName + ".csv") as nodeDecisionsFile:
-        nodeDecisionsFileReader = csv.reader(nodeDecisionsFile)
-        next(nodeDecisionsFileReader)
-        self.nodeDecisions = [tuple(line) for line in nodeDecisionsFileReader]
-      with open(self.nodeValuesFileName + ".csv") as nodeValuesFile:
-        nodeValuesFileReader = csv.reader(nodeValuesFile)
-        next(nodeValuesFileReader)
-        self.nodeValues = [tuple(line) for line in nodeValuesFileReader]
-  
+      self.nodeDecisions = next(decTup[1] for decTup in self.allNodeDecisions if decTup[0] == self.currEst)
+      self.nodeValues    = next(valtup[1] for valTup in self.allNodeValues    if valTup[0] == self.currEst)
       currErrorTup = next(iteTup for iteTup in self.treeError if int(iteTup[0]) == self.currEst)
       alpha = .5 * math.log1p((1 - float(currErrorTup[1]) ) / float(currErrorTup[1]) ) 
       df_Answers[self.className + "_total"] += alpha
       self.testDFIDs = [ (0, df_test[self.idColumn].tolist()) ]
+
       for ite in self.nodeValues:
-        nodeValueTup = (int(ite[0]),  float(ite[1]), ite[2], float(ite[3]), float(ite[4]) )
         if self.printOutput: print ("\n\tnodeValueTup=", nodeValueTup )
         dfCurr = df_test.loc[df_test[self.idColumn].isin(self.testDFIDs[nodeValueTup[0]][1])]
   
@@ -207,17 +208,13 @@ class BDT(DecisionTree):
         elif nodeValueTup[2] == 'ThisIsAnEndNode' and pd.isnull(nodeValueTup[3]) and pd.isnull(nodeValueTup[4]) and nodeValueTup[1] == 1.0: 
           self.ClassifyWithBoost_EndNode(df=dfCurr, df_Answers=df_Answers, nodeValueTup=nodeValueTup, alpha=alpha)
 
-        elif nodeValueTup[0] < maxNodeCount / 2:
+        elif nodeValueTup[0] < self.maxNodes / 2:
           self.ClassifyWithBoost_NotMaxDepth(df=dfCurr, df_Answers=df_Answers, nodeValueTup=nodeValueTup, alpha=alpha)
 
         else:
           self.ClassifyWithBoost_MaxDepthNode(nodeValueTup=nodeValueTup, df=dfCurr, df_Answers=df_Answers) 
- 
-      self.currEst += 1     
-      nodeDecisionsFile.close()
-      del nodeDecisionsFileReader
-      nodeValuesFile.close()
-      del nodeValuesFileReader 
+      self.currEst += 1
+      self.CleanTree()     
     self.ClassifyWithBoost_WriteAnswers(df_Answers=df_Answers)
 
   def ClassifyWithBoost_WriteAnswers(self, df_Answers):
@@ -243,7 +240,7 @@ class BDT(DecisionTree):
     If node is a BlankNode, then add BlankNodes for daughters.
     '''
     if self.printOutput: print ("\tdf=", self.testDFIDs[nodeValueTup[0]][1])
-    if nodeValueTup[0] < maxNodeCount / 2:
+    if nodeValueTup[0] < self.maxNodes / 2:
       self.testDFIDs.append( (nodeValueTup[0]*2 + 1, [] ) )
       self.testDFIDs.append( (nodeValueTup[0]*2 + 2, [] ) )
   
@@ -255,7 +252,7 @@ class BDT(DecisionTree):
     IDs = dfCurr[self.idColumn].tolist()
     df_Answers.loc[ df_Answers[self.idColumn].isin(IDs), self.className + "_" + str(decision[1])] += alpha
     if self.printOutput: print ("\tdecision=", decision[1], "\talpha=", alpha )
-    if nodeValueTup[0] < maxNodeCount / 2:
+    if nodeValueTup[0] < self.maxNodes / 2:
       self.testDFIDs.append( (nodeValueTup[0]*2 + 1, [] ) )
       self.testDFIDs.append( (nodeValueTup[0]*2 + 2, [] ) )
   

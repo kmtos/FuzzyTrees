@@ -237,7 +237,7 @@ class DecisionTree(object):
     return (index, ltMaxClassVal, gtMaxClassVal, ltMaxWeight, gtMaxWeight, ltTotalWeight, gtTotalWeight)
  
  
-  def GatherAndWriteDecisions(self, df, df_weights):
+  def GetDecisions(self, df, df_weights):
     '''
     This gets the decisions at each node, after the tree is fully explored using the stop requirements in the tree's initialization.
     It looks for the first non-BlankNode going from the bottom of the tree upwards.
@@ -274,6 +274,10 @@ class DecisionTree(object):
       except StopIteration:  
         self.nodeDecisions.append(currentNodeDecision )
   
+  def WriteDecisions(self, df, df_weights):
+    '''
+    Write the decisions gathered in "GetDecisions".
+    '''
     #Write out the self.nodeDecisions
     nodeDecisionsFile = open(self.nodeDecisionsFileName + ".csv", 'w')
     nodeDecisionsFileCSV=csv.writer(nodeDecisionsFile)
@@ -308,7 +312,7 @@ class DecisionTree(object):
       elif nodeValueTup[2] == 'ThisIsAnEndNode' and pd.isnull(nodeValueTup[3]) and pd.isnull(nodeValueTup[4]) and nodeValueTup[1] == 1.0: 
         self.Classify_EndNode(df=dfCurr, df_Answers=df_Answers, nodeValueTup=nodeValueTup)
 
-      elif nodeValueTup[0] < maxNodeCount / 2: 
+      elif nodeValueTup[0] < self.maxNodes / 2: 
         self.Classify_NotMaxDepth(df=dfCurr, df_Answers=df_Answers, nodeValueTup=nodeValueTup)
 
       else: 
@@ -324,7 +328,7 @@ class DecisionTree(object):
     If node is a BlankNode, then add BlankNodes for daughters.
     '''
     if self.printOutput: print ("\tdf=", self.testDFIDs[nodeValueTup[0]][1])
-    if nodeValueTup[0] < maxNodeCount / 2: 
+    if nodeValueTup[0] < self.maxNodes / 2: 
       self.testDFIDs.append( (nodeValueTup[0]*2 + 1, [] ) )
       self.testDFIDs.append( (nodeValueTup[0]*2 + 2, [] ) )
 
@@ -336,7 +340,7 @@ class DecisionTree(object):
     IDs = dfCurr[self.idColumn].tolist() 
     df_Answers.loc[ df_Answers[self.idColumn].isin(IDs) , self.className] = decision[1] 
     if self.printOutput: print ("Class for End-Node=",  decision[1], "\tlen(IDs)=", IDs)
-    if nodeValueTup[0] < maxNodeCount / 2: 
+    if nodeValueTup[0] < self.maxNodes / 2: 
       self.testDFIDs.append( (nodeValueTup[0]*2 + 1, [] ) )
       self.testDFIDs.append( (nodeValueTup[0]*2 + 2, [] ) )
 
